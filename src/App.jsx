@@ -9,6 +9,7 @@ import RunLayout from './pages/RunLayout.jsx';
 const Board = lazy(() => import('./pages/Board.jsx'));
 const BossGuide = lazy(() => import('./pages/BossGuide.jsx'));
 const BossDetail = lazy(() => import('./pages/BossDetail.jsx'));
+const Calc = lazy(() => import('./pages/Calc.jsx'));
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
           <Route index element={<Board />} />
           <Route path="bosses" element={<BossGuide />} />
           <Route path="bosses/:order" element={<BossDetail />} />
+          <Route path="calc" element={<Calc />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

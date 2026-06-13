@@ -18,6 +18,19 @@ full **boss battle guide**. Built with React + Vite, with optional live 2-player
   mini-bosses, optional bosses), **ordered by where you are in the game** (which gym you're up to).
   Each boss shows full teams with level, ability, item, nature, IVs/EVs, moves, megas, **base
   stats**, level caps, and a **permanent-weather** badge (Sun/Rain/Sand/Snow) where the team sets it.
+- **Per-Pokémon detail** — click any caught mon for its typing, base-stat bars (with nature
+  arrows), ability, and full **type weaknesses / resistances / immunities**. Track **ability** and
+  **nature** on each catch (auto-filled from the save).
+- **Search, sort & tag filters** — search the board by species / nickname / ability, **sort by any
+  base stat** (find your hardest hitter), and filter to **weather setters** or **stat changers**
+  (Intimidate, the Ruin abilities, etc.). Every filter keeps the linked partner in view.
+- **Team builder** — star up to 6 linked pairs; pick your six and your partner's six are decided
+  automatically (with warnings when a partner slot is empty, boxed, or dead).
+- **Damage calculator** — a Gen-8 calc (STAB, type effectiveness, weather, EVs/IVs/nature, stat
+  stages, crit, screens, burn, common items & abilities) that **auto-fills either side from your
+  boxes or any boss team**, so you can plan fights in seconds.
+- **Configurable Fallarbor eggs** — set how many starter eggs (3–9+) your run registers; the board
+  generates that many egg rows.
 
 ## Run it
 ```bash
@@ -40,11 +53,17 @@ vars in the Vercel project settings. `vercel.json` already handles SPA routing.
 
 ## Maintenance scripts
 Run these after a game update (they read the ROM / official sheet and regenerate bundled data):
-- `npm run extract-species -- "C:/path/to/Imperium.gba"` — pull every species' name + base stats
-  from the ROM into `src/data/species.js`.
+- `npm run extract-gamedata -- "C:/path/to/Imperium.gba"` — pull every species' name, base stats,
+  **types and abilities** plus the **ability-name** and **move** tables from the ROM into
+  `src/data/{species,abilities,moves}.js`. (Supersedes `extract-species`, which only did names+stats.)
 - `npm run import-bosses` — re-pull the official Boss Battles Google Sheet into `src/data/bosses.json`
-  (also attaches base stats + weather + progression phase; run *after* extract-species).
+  (also attaches base stats + weather + progression phase; run *after* extract-gamedata).
 - `npm run validate-save -- "C:/path/to/your.sav"` — dump a save's party + boxes to the console.
+
+## Database migration (existing Supabase projects)
+The ability/nature, egg-count and team features add columns. On an **existing** project, run
+[`supabase/migration-002.sql`](supabase/migration-002.sql) in the SQL editor once. New projects get
+everything from `supabase/schema.sql`. (Local mode needs no migration.)
 
 ## Notes
 - **Species names + stats** are extracted directly from the Imperium ROM (`gSpeciesInfo`), so they

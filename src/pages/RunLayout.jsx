@@ -26,6 +26,7 @@ export default function RunLayout() {
         <nav className="run-nav">
           <NavLink end to={`/run/${runId}`}>Soul-Link Board</NavLink>
           <NavLink to={`/run/${runId}/bosses`}>Boss Guide</NavLink>
+          <NavLink to={`/run/${runId}/calc`}>Damage Calc</NavLink>
         </nav>
       </header>
       <main className="run-main">

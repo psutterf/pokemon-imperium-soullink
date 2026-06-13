@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "extract-species": "node scripts/extract-species.mjs",
+    "extract-gamedata": "node scripts/extract-gamedata.mjs",
     "import-bosses": "node scripts/import-bosses.mjs",
     "validate-save": "node scripts/validate-save.mjs"
   },
