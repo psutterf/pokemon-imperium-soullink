@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useParams, useOutletContext, Link } from 'react-router-dom';
+import { NavLink, Outlet, useParams, Link } from 'react-router-dom';
 import { useRun } from '../lib/useRun.js';
 import { SYNC_MODE } from '../lib/store.js';
 
@@ -34,5 +34,3 @@ export default function RunLayout() {
     </div>
   );
 }
-
-export const useRunContext = () => useOutletContext();

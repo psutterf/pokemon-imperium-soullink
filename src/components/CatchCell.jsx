@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-export const STATUSES = {
+const STATUSES = {
   alive: { label: 'Alive', color: '#3fae6a' },
   boxed: { label: 'Boxed', color: '#c79b3b' },
   dead: { label: 'Dead', color: '#c0444a' },
@@ -13,8 +13,12 @@ export default function CatchCell({ value, onSave, onClear }) {
   const [draft, setDraft] = useState(value || {});
   const ref = useRef(null);
 
-  useEffect(() => setDraft(value || {}), [value]);
   useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
+
+  // Seed the draft from the current value each time editing begins, instead of
+  // syncing via an effect (which would also overwrite an in-progress edit when a
+  // live update arrives from a partner).
+  const startEditing = () => { setDraft(value || {}); setEditing(true); };
 
   const commit = () => {
     setEditing(false);
@@ -24,11 +28,11 @@ export default function CatchCell({ value, onSave, onClear }) {
 
   if (!editing) {
     if (!value || (!value.species && !value.nickname)) {
-      return <button className="cell empty" onClick={() => setEditing(true)}>+</button>;
+      return <button className="cell empty" onClick={startEditing}>+</button>;
     }
     const st = STATUSES[value.status] || STATUSES.alive;
     return (
-      <button className={`cell filled status-${value.status}`} onClick={() => setEditing(true)} title="Click to edit">
+      <button className={`cell filled status-${value.status}`} onClick={startEditing} title="Click to edit">
         <span className="dot" style={{ background: st.color }} />
         <span className="mon">
           <span className="species">{value.species || '—'}</span>

@@ -25,6 +25,9 @@ export function useRun(runId) {
 
   useEffect(() => {
     if (!runId) return;
+    // Initial fetch + live subscription to the external store (BroadcastChannel / Supabase
+    // Realtime). reload() is async, so its setState runs after awaits, not synchronously.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     reload();
     const unsub = store.subscribe(runId, reload);
     return unsub;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { store, SYNC_MODE } from '../lib/store.js';
 
@@ -11,12 +11,9 @@ export default function Home() {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const [recent, setRecent] = useState([]);
-
-  useEffect(() => {
-    const r = JSON.parse(localStorage.getItem('pis:recent') || '[]');
-    setRecent(r);
-  }, []);
+  // localStorage is available synchronously at first render, so seed from it
+  // directly rather than syncing via an effect.
+  const [recent] = useState(() => JSON.parse(localStorage.getItem('pis:recent') || '[]'));
 
   const remember = (run) => {
     const r = [{ id: run.id, name: run.name, code: run.join_code }, ...JSON.parse(localStorage.getItem('pis:recent') || '[]').filter((x) => x.id !== run.id)].slice(0, 6);
