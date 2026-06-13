@@ -1,9 +1,12 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { useRunContext } from './RunLayout.jsx';
 import { store } from '../lib/store.js';
 import { LOCATIONS, LOCATION_TYPES } from '../data/locations.js';
 import CatchCell from '../components/CatchCell.jsx';
-import SaveImport from '../components/SaveImport.jsx';
+
+// The save importer drags in the save parser + 84 KB species table, but it's only
+// used after the user clicks "Sync save", so load it on demand.
+const SaveImport = lazy(() => import('../components/SaveImport.jsx'));
 
 export default function Board() {
   const { run, reload } = useRunContext();
@@ -99,11 +102,13 @@ export default function Board() {
       </div>
 
       {importing && (
-        <SaveImport
-          run={run}
-          onClose={() => setImporting(false)}
-          onImported={reload}
-        />
+        <Suspense fallback={<div className="modal-backdrop"><div className="modal">Loading importer…</div></div>}>
+          <SaveImport
+            run={run}
+            onClose={() => setImporting(false)}
+            onImported={reload}
+          />
+        </Suspense>
       )}
     </div>
   );

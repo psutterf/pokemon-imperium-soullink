@@ -25,6 +25,7 @@ button { font-family: inherit; cursor: pointer; }
 input, select, button { font-size: 14px; }
 a { color: var(--accent2); text-decoration: none; }
 .muted { color: var(--muted); }
+.route-loading { padding: 48px; text-align: center; color: var(--muted); }
 .small { font-size: 12px; }
 .error { color: var(--danger); font-weight: 600; }
 .warn { color: var(--warn); font-size: 12px; }
