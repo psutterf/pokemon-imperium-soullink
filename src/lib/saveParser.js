@@ -13,6 +13,19 @@ const SECTION_SIZE = 4096;
 const SLOT_SECTIONS = 14;
 const SIGNATURE = 0x08012025;
 
+// Highest species id present in the Imperium ROM table. A decrypted "Pokemon" whose
+// species is past this (or whose level is impossible) means we're reading misaligned
+// bytes — e.g. a FireRed/LeafGreen save, which stores the party at a different offset.
+const MAX_SPECIES = 2200;
+
+// A real Gen-3 Pokemon never exceeds level 100, and its species is in the ROM's range.
+function isPlausibleMon(mon) {
+  if (mon.species < 1 || mon.species > MAX_SPECIES) return false;
+  if (mon.metLevel > 100) return false;
+  if (mon.level != null && (mon.level < 1 || mon.level > 100)) return false;
+  return true;
+}
+
 // Bytes of real data per section id (rest is padding before the footer).
 const SECTION_DATA_SIZE = { 0: 3884, 4: 3848, 13: 2000 }; // others default to 3968
 const dataSize = (id) => SECTION_DATA_SIZE[id] ?? 3968;
@@ -165,7 +178,22 @@ export function parseSave(input) {
     }
   }
 
-  return { party, boxes, all: [...party, ...boxes] };
+  // Sanity check: if we decrypted occupied slots but most are garbage (impossible species
+  // or levels), the layout doesn't match — almost always a non-Emerald save (FireRed/LeafGreen
+  // put the party elsewhere). Reject it rather than dumping nonsense onto the board.
+  const raw = [...party, ...boxes];
+  const plausible = raw.filter(isPlausibleMon);
+  if (raw.length >= 3 && plausible.length < raw.length * 0.5) {
+    throw new Error(
+      "This doesn't look like a compatible Emerald save. Pokémon data is unreadable — " +
+      'FireRed/LeafGreen and other games use a different layout. Use a Ruby/Sapphire/Emerald ' +
+      '(or Imperium) save.'
+    );
+  }
+
+  const keptParty = party.filter(isPlausibleMon);
+  const keptBoxes = boxes.filter(isPlausibleMon);
+  return { party: keptParty, boxes: keptBoxes, all: [...keptParty, ...keptBoxes] };
 }
 
 function concat(parts) {

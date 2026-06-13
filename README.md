@@ -11,7 +11,9 @@ full **boss battle guide**. Built with React + Vite, with optional live 2-player
   (alive / boxed / dead / voided), notes.
 - **Save sync** — upload your `.sav` and the app parses your party + PC boxes in-browser,
   auto-detecting each Pokémon and the location it was caught, then drops them onto the board.
-  Designed for **randomized** runs, where a static encounter dex doesn't apply.
+  Designed for **randomized** runs, where a static encounter dex doesn't apply. Reads
+  Ruby/Sapphire/Emerald-family saves (including Imperium); a non-Emerald save such as
+  FireRed/LeafGreen is detected and rejected with a clear message instead of importing garbage.
 - **Boss Guide** — all 131 bosses (gym leaders, Sinnoh leaders, rivals, Elite 4, Aqua/Magma,
   mini-bosses, optional bosses), **ordered by where you are in the game** (which gym you're up to).
   Each boss shows full teams with level, ability, item, nature, IVs/EVs, moves, megas, **base
@@ -52,3 +54,9 @@ Run these after a game update (they read the ROM / official sheet and regenerate
   the base form's stats, marked with a `~`. Megas with custom Imperium stats show those exactly.
 - The board only auto-fills Pokémon that are actually in your save — as you catch more and re-sync,
   more locations fill in.
+- **Supported saves:** the parser targets the Gen-3 Ruby/Sapphire/Emerald save layout. It has been
+  verified against an Imperium save, a vanilla Emerald save, and confirmed to reject a FireRed save
+  (different party layout) with a friendly error. Use `npm run validate-save -- "path/to.sav"` to
+  dump any save's party/boxes to the console.
+- **Bundle:** routes and the save importer are code-split, so the 378 KB boss dataset and the
+  species table load only on the pages that use them — not on first paint.
