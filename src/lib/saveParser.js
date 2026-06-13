@@ -128,6 +128,8 @@ function decryptMon(bytes, base, isParty) {
   const metLevel = origins & 0x7f;
   const ivWord = u32(M, 4);
   const isEgg = (ivWord >> 30 & 1) === 1;
+  const abilityNum = (ivWord >>> 31) & 1; // Gen-3 ability slot (0 or 1)
+  const nature = pid % 25;                // Gen-3 nature is derived from the PID
 
   // Shininess: (PID halves) XOR (OTID halves) < 8.
   const shinyVal = ((pid & 0xffff) ^ (pid >>> 16) ^ (otid & 0xffff) ^ (otid >>> 16)) & 0xffff;
@@ -138,7 +140,7 @@ function decryptMon(bytes, base, isParty) {
   return {
     pid, otid, nickname, otName,
     species, speciesName: speciesName(species),
-    item, isEgg, shiny,
+    item, isEgg, shiny, abilityNum, nature,
     level, metLevel,
     metLocation, metLocationName: metLocationName(metLocation),
   };

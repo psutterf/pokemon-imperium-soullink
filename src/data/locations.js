@@ -68,6 +68,24 @@ export const LOCATIONS = [
   { id: 'evergrande-zeraora', name: 'Ever Grande City — Zeraora (gift)', type: 'gift', note: 'After beating Volkner' },
 ];
 
+// Fallarbor sells unlimited starter eggs; runs typically register 3–9. Expand that single
+// row into `eggCount` rows. The first keeps its original id so existing catches stay linked;
+// extras get `-2`, `-3`, … The board and save-import build their location list through this.
+const FALLARBOR_EGG_ID = 'fallarbor-starter-egg';
+export function buildLocations(eggCount = 6) {
+  const n = Math.max(1, Math.min(24, eggCount | 0));
+  const out = [];
+  for (const loc of LOCATIONS) {
+    if (loc.id !== FALLARBOR_EGG_ID) { out.push(loc); continue; }
+    for (let i = 1; i <= n; i++) {
+      out.push(i === 1
+        ? { ...loc, name: n > 1 ? `${loc.name} #1` : loc.name }
+        : { ...loc, id: `${FALLARBOR_EGG_ID}-${i}`, name: `${loc.name} #${i}` });
+    }
+  }
+  return out;
+}
+
 export const LOCATION_TYPES = {
   route: { label: 'Route', color: '#6b9e4f' },
   town: { label: 'Town', color: '#9e8b4f' },

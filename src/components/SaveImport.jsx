@@ -1,21 +1,23 @@
 import { useMemo, useState } from 'react';
 import { parseSave } from '../lib/saveParser.js';
 import { store } from '../lib/store.js';
-import { LOCATIONS } from '../data/locations.js';
+import { abilityForSpeciesId } from '../lib/dex.js';
+import { natureName } from '../data/natures.js';
+import { buildLocations } from '../data/locations.js';
 
 // Suggest a board location id for a parsed mon based on its met-location name.
-function suggestLocation(mon) {
+function suggestLocation(mon, locations) {
   if (mon.isEgg) return '';
   const met = (mon.metLocationName || '').toLowerCase();
   if (mon.metLocation === 0) return 'starter'; // Littleroot = where the starter is given
   const routeNum = met.match(/route\s*(\d+)/)?.[1];
   if (routeNum) {
-    const hit = LOCATIONS.find((l) => l.id === `route-${routeNum}`);
+    const hit = locations.find((l) => l.id === `route-${routeNum}`);
     if (hit) return hit.id;
   }
-  const exact = LOCATIONS.find((l) => l.name.toLowerCase() === met);
+  const exact = locations.find((l) => l.name.toLowerCase() === met);
   if (exact) return exact.id;
-  const partial = LOCATIONS.find((l) => met && l.name.toLowerCase().includes(met));
+  const partial = locations.find((l) => met && l.name.toLowerCase().includes(met));
   return partial?.id || '';
 }
 
@@ -24,6 +26,8 @@ export default function SaveImport({ run, onClose, onImported }) {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const LOCATIONS = useMemo(() => buildLocations(run.egg_count), [run.egg_count]);
 
   const onFile = async (file) => {
     setErr('');
@@ -35,7 +39,7 @@ export default function SaveImport({ run, onClose, onImported }) {
         key: i,
         mon: m,
         include: true,
-        locationId: suggestLocation(m),
+        locationId: suggestLocation(m, LOCATIONS),
       })));
     } catch (e) {
       setErr(e.message);
@@ -60,6 +64,8 @@ export default function SaveImport({ run, onClose, onImported }) {
           species: m.speciesName,
           nickname: m.nickname || '',
           level: m.level || m.metLevel || null,
+          ability: m.isEgg ? '' : abilityForSpeciesId(m.species, m.abilityNum),
+          nature: natureName(m.nature),
           status: 'alive',
           source: 'save',
         });
@@ -113,7 +119,8 @@ export default function SaveImport({ run, onClose, onImported }) {
                     <div className="imon">
                       <strong>{m.speciesName}</strong>{m.nickname && <em> "{m.nickname}"</em>}
                       {m.shiny && <span className="shiny">✨</span>}{m.isEgg && <span className="egg">EGG</span>}
-                      <span className="muted small"> · {m.source}{m.box ? ` box ${m.box}` : ''} · caught Lv{m.metLevel} @ {m.metLocationName}</span>
+                      <span className="muted small"> · {m.source}{m.box ? ` box ${m.box}` : ''} · caught Lv{m.metLevel} @ {m.metLocationName}
+                        {!m.isEgg && ` · ${natureName(m.nature)} · ${abilityForSpeciesId(m.species, m.abilityNum)}`}</span>
                     </div>
                     <select value={r.locationId}
                       onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, locationId: e.target.value } : x))}>

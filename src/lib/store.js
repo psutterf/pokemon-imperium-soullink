@@ -49,10 +49,10 @@ const localStore = {
     localStorage.setItem(LKEY(doc.run.id), JSON.stringify(doc));
     channel?.postMessage({ runId: doc.run.id });
   },
-  async createRun({ name, randomized, p1, p2 }) {
+  async createRun({ name, randomized, p1, p2, eggCount }) {
     let code = makeCode();
     while (localStorage.getItem(LCODE(code))) code = makeCode();
-    const run = { id: uid(), name, join_code: code, randomized: !!randomized, tokens: emptyTokens() };
+    const run = { id: uid(), name, join_code: code, randomized: !!randomized, egg_count: eggCount ?? 6, team: [], tokens: emptyTokens() };
     const doc = {
       run,
       players: [
@@ -101,6 +101,13 @@ const localStore = {
     this._write(doc);
     return this._compose(doc);
   },
+  async updateRun(id, patch) {
+    const doc = this._read(id);
+    if (!doc) throw new Error('run not found');
+    doc.run = { ...doc.run, ...patch };
+    this._write(doc);
+    return this._compose(doc);
+  },
   subscribe(id, onChange) {
     const handler = (e) => {
       if (e.data?.runId === id) onChange();
@@ -121,7 +128,7 @@ const localStore = {
 /* Cloud adapter (Supabase)                                            */
 /* ------------------------------------------------------------------ */
 const cloudStore = {
-  async createRun({ name, randomized, p1, p2 }) {
+  async createRun({ name, randomized, p1, p2, eggCount }) {
     let code = makeCode();
     // ensure unique-ish; collisions are astronomically unlikely at this scale
     const { data, error } = await supabase
@@ -130,6 +137,8 @@ const cloudStore = {
         name,
         join_code: code,
         randomized: !!randomized,
+        egg_count: eggCount ?? 6,
+        team: [],
         tokens: emptyTokens(),
         players: [
           { slot: 1, name: p1 || 'Player 1' },
@@ -168,6 +177,11 @@ const cloudStore = {
     const { data: run } = await supabase.from('runs').select('tokens').eq('id', id).single();
     const next = { ...run.tokens, [slot]: { ...run.tokens[slot], ...tokens } };
     const { data } = await supabase.from('runs').update({ tokens: next }).eq('id', id).select().single();
+    return data;
+  },
+  async updateRun(id, patch) {
+    const { data, error } = await supabase.from('runs').update(patch).eq('id', id).select().single();
+    if (error) throw error;
     return data;
   },
   subscribe(id, onChange) {

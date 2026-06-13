@@ -9,6 +9,8 @@ create table if not exists runs (
   name        text not null,
   join_code   text not null unique,
   randomized  boolean not null default true,
+  egg_count   int  not null default 6,   -- Fallarbor starter eggs to register
+  team        jsonb not null default '[]'::jsonb, -- soul-link team: up to 6 location ids
   tokens      jsonb not null default '{"1":{"nav":0,"reroll":0},"2":{"nav":0,"reroll":0}}',
   players     jsonb not null default '[{"slot":1,"name":"Player 1"},{"slot":2,"name":"Player 2"}]',
   created_at  timestamptz not null default now()
@@ -22,6 +24,8 @@ create table if not exists catches (
   species      text,
   nickname     text,
   level        int,
+  ability      text,
+  nature       text,
   status       text not null default 'alive',  -- alive | boxed | dead | voided
   source       text not null default 'manual', -- manual | save
   notes        text,
