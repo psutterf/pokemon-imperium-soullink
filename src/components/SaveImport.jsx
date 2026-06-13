@@ -1,0 +1,137 @@
+import { useMemo, useState } from 'react';
+import { parseSave } from '../lib/saveParser.js';
+import { store } from '../lib/store.js';
+import { LOCATIONS } from '../data/locations.js';
+
+// Suggest a board location id for a parsed mon based on its met-location name.
+function suggestLocation(mon) {
+  if (mon.isEgg) return '';
+  const met = (mon.metLocationName || '').toLowerCase();
+  if (mon.metLocation === 0) return 'starter'; // Littleroot = where the starter is given
+  const routeNum = met.match(/route\s*(\d+)/)?.[1];
+  if (routeNum) {
+    const hit = LOCATIONS.find((l) => l.id === `route-${routeNum}`);
+    if (hit) return hit.id;
+  }
+  const exact = LOCATIONS.find((l) => l.name.toLowerCase() === met);
+  if (exact) return exact.id;
+  const partial = LOCATIONS.find((l) => met && l.name.toLowerCase().includes(met));
+  return partial?.id || '';
+}
+
+export default function SaveImport({ run, onClose, onImported }) {
+  const [slot, setSlot] = useState(1);
+  const [rows, setRows] = useState(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const onFile = async (file) => {
+    setErr('');
+    try {
+      const buf = new Uint8Array(await file.arrayBuffer());
+      const { all } = parseSave(buf);
+      if (!all.length) { setErr('No Pokémon found in that save (party and boxes are empty).'); return; }
+      setRows(all.map((m, i) => ({
+        key: i,
+        mon: m,
+        include: true,
+        locationId: suggestLocation(m),
+      })));
+    } catch (e) {
+      setErr(e.message);
+    }
+  };
+
+  const usedLocations = useMemo(() => {
+    const taken = new Set(run.catches.filter((c) => c.slot === slot && c.species).map((c) => c.location_id));
+    return taken;
+  }, [run.catches, slot]);
+
+  const confirm = async () => {
+    setBusy(true);
+    try {
+      for (const r of rows) {
+        if (!r.include || !r.locationId) continue;
+        const m = r.mon;
+        await store.upsertCatch(run.id, {
+          id: `${r.locationId}:${slot}`,
+          location_id: r.locationId,
+          slot,
+          species: m.speciesName,
+          nickname: m.nickname || '',
+          level: m.level || m.metLevel || null,
+          status: 'alive',
+          source: 'save',
+        });
+      }
+      onImported();
+      onClose();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h2>Sync from save file</h2>
+          <button className="x" onClick={onClose}>×</button>
+        </div>
+
+        <div className="import-controls">
+          <label>Importing as:&nbsp;
+            <select value={slot} onChange={(e) => setSlot(Number(e.target.value))}>
+              {run.players.map((p) => <option key={p.slot} value={p.slot}>{p.name}</option>)}
+            </select>
+          </label>
+          <label className="filebtn">
+            Choose .sav…
+            <input type="file" accept=".sav,.sa1,.srm,application/octet-stream" hidden
+              onChange={(e) => e.target.files[0] && onFile(e.target.files[0])} />
+          </label>
+        </div>
+
+        {err && <p className="error">{err}</p>}
+        <p className="muted small">
+          Tip: save in your emulator first. Species shown as <code>#NNN</code> are Gen 3–9 mons this
+          hack remaps — rename them on the board. Met locations are read straight from each Pokémon.
+        </p>
+
+        {rows && (
+          <>
+            <div className="import-list">
+              {rows.map((r, i) => {
+                const m = r.mon;
+                const dup = r.locationId && usedLocations.has(r.locationId);
+                return (
+                  <div className={`import-row ${r.include ? '' : 'off'}`} key={r.key}>
+                    <input type="checkbox" checked={r.include}
+                      onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, include: e.target.checked } : x))} />
+                    <div className="imon">
+                      <strong>{m.speciesName}</strong>{m.nickname && <em> "{m.nickname}"</em>}
+                      {m.shiny && <span className="shiny">✨</span>}{m.isEgg && <span className="egg">EGG</span>}
+                      <span className="muted small"> · {m.source}{m.box ? ` box ${m.box}` : ''} · caught Lv{m.metLevel} @ {m.metLocationName}</span>
+                    </div>
+                    <select value={r.locationId}
+                      onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, locationId: e.target.value } : x))}>
+                      <option value="">— unassigned —</option>
+                      {LOCATIONS.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    </select>
+                    {dup && <span className="dup" title="Overwrites an existing catch on this location">replaces</span>}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="modal-foot">
+              <span className="muted">{rows.filter((r) => r.include && r.locationId).length} to import</span>
+              <button className="primary" disabled={busy} onClick={confirm}>Import</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
