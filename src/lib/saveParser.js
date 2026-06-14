@@ -129,7 +129,9 @@ function decryptMon(bytes, base, isParty) {
   for (let i = 0; i < 4; i++) sub[order[i]] = dec.subarray(i * 12, i * 12 + 12);
 
   const G = sub.G, M = sub.M, A = sub.A;
-  const species = u16(G, 0);
+  // Species is the low 11 bits of this u16 — the pokeemerald-expansion build (Imperium) packs
+  // form/flag bits into the top 5. Vanilla species all fit in 11 bits too, so masking is safe.
+  const species = u16(G, 0) & 0x7ff;
   const moveIds = [u16(A, 0), u16(A, 2), u16(A, 4), u16(A, 6)].filter((id) => id > 0);
   const item = u16(G, 2);
   const metLocation = M[1];
