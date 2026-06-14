@@ -289,6 +289,17 @@ button.danger { background: var(--danger); color: #fff; border: none; border-rad
 .dmg-range { font-size: 30px; font-weight: 800; }
 .dmg-pct { font-size: 20px; color: var(--accent); font-weight: 700; }
 .dmg-immune { color: var(--muted); font-style: italic; }
+.dmg-blocks { display: flex; flex-direction: column; gap: 12px; text-align: left; }
+.dmg-block { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.db-head { font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+.dmg-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.dmg-row { display: grid; grid-template-columns: 1fr auto auto auto; gap: 6px; align-items: center; font-size: 12px; }
+.dr-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dr-pct { color: var(--accent); font-weight: 700; }
+.dr-immune { color: var(--muted); font-style: italic; }
+.mf-moves { display: flex; flex-direction: column; gap: 4px; }
+.mf-moves .fc-head { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+.mf-moves input { width: 100%; }
 .dmg-eff { display: flex; flex-direction: column; gap: 6px; align-items: center; margin: 8px 0; font-size: 12px; }
 .eff-badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--bg3); border: 1px solid var(--line); }
 .eff-badge.eff-0 { color: var(--muted); }

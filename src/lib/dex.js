@@ -60,6 +60,7 @@ export const MOVE_NAMES = Object.values(MOVES).map((m) => m.n).sort();
 const MOVE_BY_NAME = {};
 for (const m of Object.values(MOVES)) MOVE_BY_NAME[norm(m.n)] = m;
 export const findMove = (name) => MOVE_BY_NAME[norm(name)] || null;
+export const moveName = (id) => MOVES[id]?.n || null;
 
 // Parse a boss spread string like "6 HP / 252 SpA / 252 Spe" into a [HP,Atk,Def,Spe,SpA,SpD]
 // array, filling unlisted stats with `fill` (0 for EVs, 31 for IVs).

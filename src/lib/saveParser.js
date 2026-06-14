@@ -120,8 +120,9 @@ function decryptMon(bytes, base, isParty) {
   const sub = {};
   for (let i = 0; i < 4; i++) sub[order[i]] = dec.subarray(i * 12, i * 12 + 12);
 
-  const G = sub.G, M = sub.M;
+  const G = sub.G, M = sub.M, A = sub.A;
   const species = u16(G, 0);
+  const moveIds = [u16(A, 0), u16(A, 2), u16(A, 4), u16(A, 6)].filter((id) => id > 0);
   const item = u16(G, 2);
   const metLocation = M[1];
   const origins = u16(M, 2);
@@ -140,7 +141,7 @@ function decryptMon(bytes, base, isParty) {
   return {
     pid, otid, nickname, otName,
     species, speciesName: speciesName(species),
-    item, isEgg, shiny, abilityNum, nature,
+    item, isEgg, shiny, abilityNum, nature, moveIds,
     level, metLevel,
     metLocation, metLocationName: metLocationName(metLocation),
   };

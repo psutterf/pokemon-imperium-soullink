@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { parseSave } from '../lib/saveParser.js';
 import { store } from '../lib/store.js';
 import { natureName } from '../data/natures.js';
+import { moveName } from '../lib/dex.js';
 import { buildLocations } from '../data/locations.js';
 
 // Suggest a board location id for a parsed mon based on its met-location name.
@@ -68,6 +69,7 @@ export default function SaveImport({ run, onClose, onImported }) {
           // entry (the ability field autocompletes, including Imperium's custom abilities).
           ability: '',
           nature: natureName(m.nature),
+          moves: (m.moveIds || []).map(moveName).filter(Boolean),
           status: 'alive',
           source: 'save',
         });

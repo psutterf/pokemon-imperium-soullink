@@ -26,6 +26,7 @@ create table if not exists catches (
   level        int,
   ability      text,
   nature       text,
+  moves        jsonb not null default '[]'::jsonb,  -- move names (read from the save)
   status       text not null default 'alive',  -- alive | boxed | dead | voided
   source       text not null default 'manual', -- manual | save
   notes        text,

@@ -10,10 +10,13 @@ import { STAT_LABELS } from '../data/bossMeta.js';
 const ITEMS = ['', 'Life Orb', 'Choice Band', 'Choice Specs', 'Expert Belt', 'Assault Vest',
   'Muscle Band', 'Wise Glasses'];
 
+const pad4 = (arr) => [...(arr || []), '', '', '', ''].slice(0, 4);
+
 const blankMon = () => ({
   source: 'manual', species: '', level: 50, nature: 'Hardy', ability: '', item: '',
   evs: [0, 0, 0, 0, 0, 0], ivs: [31, 31, 31, 31, 31, 31],
-  boost: 0, defBoost: 0, spdBoost: 0, hpPct: 100, status: false, moveName: '', bossMoves: null,
+  boost: 0, defBoost: 0, spdBoost: 0, hpPct: 100, status: false,
+  moves: ['', '', '', ''], bossMoves: null,
 });
 
 // Turn a form into the spec the damage engine expects (or null if species unknown).
@@ -29,6 +32,12 @@ function toSpec(form) {
     hpPct: Number(form.hpPct) || 100, status: form.status,
   };
 }
+
+const oneMove = (atk, def, name, f) => {
+  const mv = findMove(name);
+  if (!mv) return null;
+  return { name, move: mv, res: calcDamage({ attacker: atk, defender: def, move: { power: mv.p, type: mv.t, c: mv.c, contact: false }, field: f }) };
+};
 
 export default function Calc() {
   const { run } = useRunContext();
@@ -48,25 +57,27 @@ export default function Calc() {
 
   const result = useMemo(() => {
     const a = toSpec(att), d = toSpec(def);
-    const mv = findMove(att.moveName);
     if (!a || !d) return { error: 'Pick a species for both sides.' };
-    if (!mv) return { error: 'Pick an attacking move.' };
-    return calcDamage({
-      attacker: a, defender: { ...d, defBoost: def.defBoost, spdBoost: def.spdBoost },
-      move: { power: mv.p, type: mv.t, c: mv.c, contact: false },
-      field,
-    });
+    // Reverse direction keeps only field-wide effects (weather/terrain/ruin/format/inverse);
+    // side-specific things (screens, crit, support) apply to the attacker→defender direction.
+    const rev = {
+      format: field.format, weather: field.weather, terrain: field.terrain, inverse: field.inverse,
+      ruinSword: field.ruinSword, ruinBeads: field.ruinBeads, ruinTablets: field.ruinTablets, ruinVessel: field.ruinVessel,
+    };
+    return {
+      aName: a.name, dName: d.name,
+      aToD: att.moves.map((m) => oneMove(a, d, m, field)).filter(Boolean),
+      dToA: def.moves.map((m) => oneMove(d, a, m, rev)).filter(Boolean),
+    };
   }, [att, def, field]);
-
-  const mv = findMove(att.moveName);
 
   return (
     <div className="calc">
-      <p className="muted small">Gen-8 damage calculator. Auto-fill either side from your boxes or a boss team, tweak any field, and read the damage range.</p>
+      <p className="muted small">Gen-8 damage calculator. Auto-fill either side from your boxes or a boss team, add up to four moves each, and read the damage both ways.</p>
       <div className="calc-grid">
         <MonForm role="attacker" form={att} setForm={setAtt} boxMons={boxMons} />
         <div className="calc-mid">
-          <Result result={result} move={mv} att={att} def={def} field={field} setField={setField} />
+          <Result result={result} field={field} setField={setField} />
         </div>
         <MonForm role="defender" form={def} setForm={setDef} boxMons={boxMons} />
       </div>
@@ -74,28 +85,40 @@ export default function Calc() {
   );
 }
 
-function Result({ result, move, att, def, field, setField }) {
+function MoveRow({ row }) {
+  const { name, res } = row;
+  if (res.error) return <li className="dmg-row"><span className="dr-name">{name}</span><span className="muted">—</span></li>;
+  if (res.immune) return <li className="dmg-row"><span className="dr-name">{name}</span><span className="dr-immune">immune</span></li>;
+  return (
+    <li className="dmg-row">
+      <span className="dr-name">{name}</span>
+      <span className="dr-pct">{res.minPct}–{res.maxPct}%</span>
+      <span className={`eff-badge eff-${res.eff}`}>×{res.eff}</span>
+      <span className="dr-ko muted small">{res.guaranteedKO ? 'OHKO' : `${res.hitsToKO}HKO`}</span>
+    </li>
+  );
+}
+
+function Result({ result, field, setField }) {
   const toggle = (k) => setField((f) => ({ ...f, [k]: !f[k] }));
   return (
     <div className="result-card">
-      <h3>Result</h3>
+      <h3>Damage</h3>
       {result.error ? (
         <p className="muted">{result.error}</p>
-      ) : result.immune ? (
-        <p className="dmg-immune">No effect (immune).</p>
       ) : (
-        <>
-          <div className="dmg-range">{result.min}–{result.max}</div>
-          <div className="dmg-pct">{result.minPct}% – {result.maxPct}%</div>
-          <div className="dmg-eff">
-            {move && <span>{att.species || '?'}'s {move.n} → {def.species || '?'}</span>}
-            <span className={`eff-badge eff-${result.eff}`}>×{result.eff}</span>
+        <div className="dmg-blocks">
+          <div className="dmg-block">
+            <div className="db-head">⚔ {result.aName} → {result.dName}</div>
+            {result.aToD.length ? <ul className="dmg-list">{result.aToD.map((r, i) => <MoveRow key={i} row={r} />)}</ul>
+              : <p className="muted small">Add moves on the attacker.</p>}
           </div>
-          <div className="muted small">
-            {result.guaranteedKO ? 'Guaranteed OHKO' : `${result.hitsToKO} hit(s) to KO`} · target HP {result.maxHP}
-            {move ? ` · ${result.power} BP ${move.c}` : ''}
+          <div className="dmg-block">
+            <div className="db-head">🛡 {result.dName} → {result.aName}</div>
+            {result.dToA.length ? <ul className="dmg-list">{result.dToA.map((r, i) => <MoveRow key={i} row={r} />)}</ul>
+              : <p className="muted small">Add moves on the defender.</p>}
           </div>
-        </>
+        </div>
       )}
 
       <div className="field-conds">
@@ -115,7 +138,7 @@ function Result({ result, move, att, def, field, setField }) {
         </select></label>
 
         <div className="fc-group">
-          <span className="fc-head">Screens (on defender)</span>
+          <span className="fc-head">Screens (protect defender)</span>
           <label className="ck"><input type="checkbox" checked={field.reflect} onChange={() => toggle('reflect')} /> Reflect</label>
           <label className="ck"><input type="checkbox" checked={field.lightScreen} onChange={() => toggle('lightScreen')} /> Light Screen</label>
           <label className="ck"><input type="checkbox" checked={field.auroraVeil} onChange={() => toggle('auroraVeil')} /> Aurora Veil</label>
@@ -136,7 +159,7 @@ function Result({ result, move, att, def, field, setField }) {
           <label className="ck"><input type="checkbox" checked={field.ruinVessel} onChange={() => toggle('ruinVessel')} /> Vessel of Ruin</label>
         </div>
         <div className="fc-group">
-          <span className="fc-head">Other</span>
+          <span className="fc-head">Other (attacker→defender)</span>
           <label className="ck"><input type="checkbox" checked={field.crit} onChange={() => toggle('crit')} /> Critical hit</label>
           <label className="ck"><input type="checkbox" checked={field.burn} onChange={() => toggle('burn')} /> Attacker burned</label>
           <label className="ck"><input type="checkbox" checked={field.spread} onChange={() => toggle('spread')} /> Spread move</label>
@@ -158,16 +181,17 @@ function MonForm({ role, form, setForm, boxMons }) {
     const c = boxMons.find((m) => `${m.location_id}:${m.slot}` === id);
     if (!c) return;
     set({ species: c.species, level: c.level || 50, ability: c.ability || '', nature: c.nature || 'Hardy',
-      item: '', evs: [0, 0, 0, 0, 0, 0], ivs: [31, 31, 31, 31, 31, 31], bossMoves: null, moveName: '' });
+      item: '', evs: [0, 0, 0, 0, 0, 0], ivs: [31, 31, 31, 31, 31, 31], moves: pad4(c.moves), bossMoves: null });
   };
   const fromBossMon = (boss, p) => {
     set({
       species: p.species.replace(/-Mega.*$/, ''), level: p.level || 50, ability: p.ability || '',
       nature: p.nature || 'Hardy', item: p.item || '',
       evs: parseSpread(p.evs, 0), ivs: parseSpread(p.ivs, 31),
-      bossMoves: p.moves || [], moveName: isAtt ? (p.moves?.[0] || '') : '',
+      moves: pad4(p.moves), bossMoves: p.moves || [],
     });
   };
+  const setMove = (i, v) => { const m = [...form.moves]; m[i] = v; set({ moves: m }); };
 
   const boss = bossIdx === '' ? null : bosses[Number(bossIdx)];
   const moveOptions = form.bossMoves?.length ? form.bossMoves : MOVE_NAMES;
@@ -208,24 +232,25 @@ function MonForm({ role, form, setForm, boxMons }) {
         <label>Item<select value={form.item} onChange={(e) => set({ item: e.target.value })}>{ITEMS.map((it) => <option key={it} value={it}>{it || '(none)'}</option>)}</select></label>
       </div>
 
-      {isAtt && (
-        <label className="mf-row">Move
-          <input list={`moves-${role}`} value={form.moveName} onChange={(e) => set({ moveName: e.target.value })} placeholder="Move" />
-          <datalist id={`moves-${role}`}>{moveOptions.map((m) => <option key={m} value={m} />)}</datalist>
-        </label>
-      )}
+      <div className="mf-moves">
+        <span className="fc-head">Moves</span>
+        <div className="mf-grid2">
+          {form.moves.map((mv, i) => (
+            <input key={i} list={`moves-${role}`} value={mv} placeholder={`Move ${i + 1}`}
+              onChange={(e) => setMove(i, e.target.value)} />
+          ))}
+        </div>
+        <datalist id={`moves-${role}`}>{moveOptions.map((m) => <option key={m} value={m} />)}</datalist>
+      </div>
 
-      <StatEditor form={form} set={set} stats={stats} role={role} />
+      <StatEditor form={form} set={set} stats={stats} />
 
       <div className="mf-grid2">
-        {isAtt
-          ? <label>Atk boost<BoostSelect value={form.boost} onChange={(v) => set({ boost: v })} /></label>
-          : <>
-              <label>Def boost<BoostSelect value={form.defBoost} onChange={(v) => set({ defBoost: v })} /></label>
-              <label>SpD boost<BoostSelect value={form.spdBoost} onChange={(v) => set({ spdBoost: v })} /></label>
-            </>}
+        <label>Atk/SpA boost<BoostSelect value={form.boost} onChange={(v) => set({ boost: v })} /></label>
+        <label>Def boost<BoostSelect value={form.defBoost} onChange={(v) => set({ defBoost: v })} /></label>
+        <label>SpD boost<BoostSelect value={form.spdBoost} onChange={(v) => set({ spdBoost: v })} /></label>
         <label>HP %<input type="number" min="1" max="100" value={form.hpPct} onChange={(e) => set({ hpPct: e.target.value })} /></label>
-        {isAtt && <label className="ck">Statused<input type="checkbox" checked={form.status} onChange={(e) => set({ status: e.target.checked })} /></label>}
+        <label className="ck">Statused<input type="checkbox" checked={form.status} onChange={(e) => set({ status: e.target.checked })} /></label>
       </div>
 
       <datalist id="all-species">{SPECIES_NAMES.map((s) => <option key={s} value={s} />)}</datalist>
