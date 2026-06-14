@@ -84,9 +84,11 @@ projects get everything from `supabase/schema.sql`. (Local mode needs no migrati
   the base form's stats, marked with a `~`. Megas with custom Imperium stats show those exactly.
 - The board only auto-fills Pokémon that are actually in your save — as you catch more and re-sync,
   more locations fill in.
-- **Supported saves:** the parser targets the Gen-3 Ruby/Sapphire/Emerald save layout. It has been
-  verified against an Imperium save, a vanilla Emerald save, and confirmed to reject a FireRed save
-  (different party layout) with a friendly error. Use `npm run validate-save -- "path/to.sav"` to
-  dump any save's party/boxes to the console.
+- **Supported saves:** the parser auto-detects two layouts — standard Gen-3 Emerald (two slots,
+  3968-byte sectors, PC at section ids 5–13) and Imperium's pokeemerald-expansion build (single
+  28-section save, 4084-byte sectors, PC at ids 17–25, with the species packed into the low 11 bits
+  of its field). Verified against an Imperium save (party + boxes) and a vanilla Emerald save, and it
+  rejects a FireRed save (different layout) with a friendly error. Use `npm run validate-save --
+  "path/to.sav"` to dump a save's party/boxes to the console.
 - **Bundle:** routes and the save importer are code-split, so the 378 KB boss dataset and the
   species table load only on the pages that use them — not on first paint.
