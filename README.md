@@ -25,7 +25,8 @@ full **boss battle guide**. Built with React + Vite, with optional live 2-player
   **nature** per catch. Nature auto-fills from the save; ability is entered manually with
   autocomplete (Imperium randomizes abilities per-run via a seed that isn't saved, so it can't be
   read from the file — the autocomplete includes Imperium's custom abilities). Re-syncing a save
-  refreshes species/level/nature/moves but **keeps your hand-entered ability**.
+  refreshes species/level/nature/moves but **keeps your hand-entered ability**. **Status follows
+  your PC: a Pokémon in box 14 is imported as dead, anything else as alive** (house rule).
 - **Search, sort & tag filters** — search the board by species / nickname / ability, **sort by any
   base stat** (find your hardest hitter), and filter to **weather setters** or **stat changers**
   (Intimidate, the Ruin abilities, etc.). Every filter keeps the linked partner in view.
