@@ -144,6 +144,8 @@ button.danger { background: var(--danger); color: #fff; border: none; border-rad
 .import-list { overflow-y: auto; padding: 8px 20px; }
 .import-row { display: grid; grid-template-columns: auto 1fr 200px auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
 .import-row.off { opacity: .45; }
+.import-row.unmatched { background: rgba(192, 68, 74, .1); border-radius: 6px; }
+.import-row.unmatched select { border-color: var(--danger); }
 .imon strong { font-weight: 700; }
 .imon em { color: var(--muted); font-style: normal; }
 .shiny { margin-left: 4px; }

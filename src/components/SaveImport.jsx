@@ -118,14 +118,22 @@ export default function SaveImport({ run, onClose, onImported }) {
           else (party or another box) is alive.
         </p>
 
+        {rows && rows.some((r) => r.include && !r.locationId) && (
+          <p className="error">
+            ⚠ {rows.filter((r) => r.include && !r.locationId).length} Pokémon didn't match a board
+            location automatically — pick a location in the dropdown, or they won't be imported.
+          </p>
+        )}
+
         {rows && (
           <>
             <div className="import-list">
               {rows.map((r, i) => {
                 const m = r.mon;
                 const dup = r.locationId && usedLocations.has(r.locationId);
+                const unmatched = r.include && !r.locationId;
                 return (
-                  <div className={`import-row ${r.include ? '' : 'off'}`} key={r.key}>
+                  <div className={`import-row ${r.include ? '' : 'off'} ${unmatched ? 'unmatched' : ''}`} key={r.key}>
                     <input type="checkbox" checked={r.include}
                       onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, include: e.target.checked } : x))} />
                     <div className="imon">
