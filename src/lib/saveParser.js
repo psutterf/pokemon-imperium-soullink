@@ -26,9 +26,14 @@ function isPlausibleMon(mon) {
   return true;
 }
 
-// Bytes of real data per section id (rest is padding before the footer).
-const SECTION_DATA_SIZE = { 0: 3884, 4: 3848, 13: 2000 }; // others default to 3968
-const dataSize = (id) => SECTION_DATA_SIZE[id] ?? 3968;
+// Footer-validated checksum: sum the section's 32-bit data words, fold to 16 bits. Used to
+// auto-detect this build's section data size (vanilla = 3968 bytes; the Imperium expansion
+// build uses the full 4084 = 4096 - 12-byte footer).
+function sectionChecksum(bytes, off, size) {
+  let s = 0;
+  for (let i = 0; i < size; i += 4) s = (s + u32(bytes, off + i)) >>> 0;
+  return ((s & 0xffff) + (s >>> 16)) & 0xffff;
+}
 
 // PID % 24 -> order of substructures Growth/Attacks/EVs/Misc.
 const ORDERS = [
@@ -39,60 +44,66 @@ const ORDERS = [
 const u16 = (b, o) => b[o] | (b[o + 1] << 8);
 const u32 = (b, o) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
 
-// Locate the active save's section map (logical id 0-13 -> absolute offset).
+// Locate the active save and return { map: id->offset, dataSize, pcStart, pcEnd }.
 //
-// The two save slots are ALWAYS the two physical halves (sections 0-13 and 14-27); the active
-// slot is the half that holds data (tie-broken by the higher save counter at 0xFFC). Within a
-// slot the logical id is the 0xFF4 field mod 14 — which also handles this Emerald build's rolling
-// convention where 0xFF4 is a global write counter running 0..27 across both halves instead of
-// resetting per slot. (Grouping by the rolling counter instead of the physical half split the
-// current save across groups and could drop PC boxes — hence grouping strictly by phys half.)
+// Two layouts are supported:
+//  - Standard Gen-3 Emerald: two save slots in the two physical halves (sections 0-13 / 14-27),
+//    section id at 0xFF4 is 0-13 (so each id appears twice), data size 3968, PC boxes at ids 5-13.
+//    The active slot is the half holding data, tie-broken by the save counter at 0xFFC.
+//  - Imperium (pokeemerald-expansion): ONE 28-section save, section id at 0xFF4 runs 0-27 (each
+//    once), data size 4084 (full sector minus the 12-byte footer), PC boxes at ids 17-25.
 function locateActiveSections(bytes) {
   const sections = [];
-  const maxSections = Math.min(28, Math.floor(bytes.length / SECTION_SIZE));
+  const maxSections = Math.min(32, Math.floor(bytes.length / SECTION_SIZE));
   for (let s = 0; s < maxSections; s++) {
     const off = s * SECTION_SIZE;
     if (u32(bytes, off + 0x0ff8) !== SIGNATURE) continue;
-    const rawid = u16(bytes, off + 0x0ff4);
     sections.push({
-      off,
-      phys: s,
-      rawid,
-      id: rawid % SLOT_SECTIONS,
+      off, phys: s,
+      id: u16(bytes, off + 0x0ff4),
+      storedCk: u16(bytes, off + 0x0ff6),
       counter: u32(bytes, off + 0x0ffc),
-      hasData: u16(bytes, off + 0x0ff6) !== 0, // stored checksum != 0 => real data
     });
   }
   if (!sections.length) return null;
 
-  const groupKey = (s) => Math.floor(s.phys / SLOT_SECTIONS);
+  // Detect data size: a data-heavy section only checksum-matches at its true size.
+  let dataSize = 3968;
+  for (const s of sections) {
+    if (s.storedCk
+      && sectionChecksum(bytes, s.off, 4084) === s.storedCk
+      && sectionChecksum(bytes, s.off, 3968) !== s.storedCk) { dataSize = 4084; break; }
+  }
 
+  const maxId = Math.max(...sections.map((s) => s.id));
+  if (maxId > SLOT_SECTIONS - 1) {
+    // Expansion single-save: section id is unique 0..maxId; map directly. PC boxes at ids 17-25.
+    const map = {};
+    for (const s of sections) map[s.id] = s.off;
+    return { map, dataSize, pcStart: 17, pcEnd: 25 };
+  }
+
+  // Standard two-slot save: group by physical half, pick the active one.
   const groups = new Map();
   for (const sec of sections) {
-    const k = groupKey(sec);
+    const k = Math.floor(sec.phys / SLOT_SECTIONS);
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k).push(sec);
   }
-
-  // Active group: most sections carrying data, tie-broken by highest save counter.
   let best = null;
   for (const [, secs] of groups) {
-    const score = secs.filter((s) => s.hasData).length;
+    const score = secs.filter((s) => s.storedCk !== 0).length;
     const counter = Math.max(...secs.map((s) => (s.counter === 0xffffffff ? -1 : s.counter)));
-    if (!best || score > best.score || (score === best.score && counter > best.counter)) {
-      best = { secs, score, counter };
-    }
+    if (!best || score > best.score || (score === best.score && counter > best.counter)) best = { secs, counter, score };
   }
-
-  const map = {};
+  const pick = {};
   for (const sec of best.secs) {
-    // If two sections share an id within a group, keep the one with data / higher counter.
-    const cur = map[sec.id];
-    if (!cur || (sec.hasData && !cur.hasData) || sec.counter > cur.counter) map[sec.id] = sec;
+    const cur = pick[sec.id];
+    if (!cur || (sec.storedCk && !cur.storedCk) || sec.counter > cur.counter) pick[sec.id] = sec;
   }
-  const out = {};
-  for (const id of Object.keys(map)) out[id] = map[id].off;
-  return out;
+  const map = {};
+  for (const id of Object.keys(pick)) map[id] = pick[id].off;
+  return { map, dataSize, pcStart: 5, pcEnd: 13 };
 }
 
 function decryptMon(bytes, base, isParty) {
@@ -148,8 +159,9 @@ export function parseSave(input) {
   const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
   if (bytes.length < SLOT_SECTIONS * SECTION_SIZE) throw new Error('File too small to be a Gen-3 save.');
 
-  const map = locateActiveSections(bytes);
-  if (!map) throw new Error('No valid Gen-3 save sections found.');
+  const loc = locateActiveSections(bytes);
+  if (!loc) throw new Error('No valid Gen-3 save sections found.');
+  const { map, dataSize, pcStart, pcEnd } = loc;
 
   // Party: section id 1, count @0x234, entries @0x238 (100 bytes each).
   const party = [];
@@ -162,11 +174,11 @@ export function parseSave(input) {
     }
   }
 
-  // PC boxes: concatenate data of sections 5..13, then read 420 box mons (80 bytes each).
+  // PC boxes: concatenate the data of the PC sections, then read 420 box mons (80 bytes each).
   const pcParts = [];
-  for (let id = 5; id <= 13; id++) {
+  for (let id = pcStart; id <= pcEnd; id++) {
     if (map[id] == null) continue;
-    pcParts.push(bytes.subarray(map[id], map[id] + dataSize(id)));
+    pcParts.push(bytes.subarray(map[id], map[id] + dataSize));
   }
   const pc = concat(pcParts);
   const boxes = [];
