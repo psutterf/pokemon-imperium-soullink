@@ -41,14 +41,12 @@ const u32 = (b, o) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 
 
 // Locate the active save's section map (logical id 0-13 -> absolute offset).
 //
-// Handles two on-disk conventions:
-//  - Standard Gen-3: the field at 0xFF4 is the section id (0-13); two slots sit in the two
-//    physical halves; the active slot has the higher save counter at 0xFFC.
-//  - Rolling (seen in this Emerald build): 0xFF4 is a global write counter that keeps
-//    incrementing (0..27 across both slots) instead of resetting; logical id = counter % 14,
-//    and the two slots are the two contiguous counter groups (0-13 and 14-27), scattered
-//    across physical sections.
-// In both cases we group sections, pick the group that actually holds data, and map by id.
+// The two save slots are ALWAYS the two physical halves (sections 0-13 and 14-27); the active
+// slot is the half that holds data (tie-broken by the higher save counter at 0xFFC). Within a
+// slot the logical id is the 0xFF4 field mod 14 — which also handles this Emerald build's rolling
+// convention where 0xFF4 is a global write counter running 0..27 across both halves instead of
+// resetting per slot. (Grouping by the rolling counter instead of the physical half split the
+// current save across groups and could drop PC boxes — hence grouping strictly by phys half.)
 function locateActiveSections(bytes) {
   const sections = [];
   const maxSections = Math.min(28, Math.floor(bytes.length / SECTION_SIZE));
@@ -67,8 +65,7 @@ function locateActiveSections(bytes) {
   }
   if (!sections.length) return null;
 
-  const rolling = sections.some((s) => s.rawid >= SLOT_SECTIONS);
-  const groupKey = (s) => (rolling ? Math.floor(s.rawid / SLOT_SECTIONS) : Math.floor(s.phys / SLOT_SECTIONS));
+  const groupKey = (s) => Math.floor(s.phys / SLOT_SECTIONS);
 
   const groups = new Map();
   for (const sec of sections) {
