@@ -159,6 +159,7 @@ button.danger { background: var(--danger); color: #fff; border: none; border-rad
 .scaled-divider span { font-size: 18px; font-weight: 800; }
 .scaled-divider p { margin: 4px 0 0; }
 .cap.scaled { color: var(--muted); }
+.opt-badge { font-size: 9px; text-transform: uppercase; letter-spacing: .5px; color: var(--accent2); background: var(--bg3); border: 1px solid var(--accent2); border-radius: 6px; padding: 1px 6px; }
 .boss-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
 .boss-card { background: var(--bg2); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; display: block; color: var(--text); }
 .boss-card:hover { border-color: var(--accent2); }

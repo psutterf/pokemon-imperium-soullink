@@ -3,16 +3,35 @@ import { Link, useParams } from 'react-router-dom';
 import bosses from '../data/bosses.json';
 import { WEATHER_ICON } from '../data/bossMeta.js';
 
-const isLeader = (b) => (b.category === 'Hoenn Leaders' ? 1 : 0);
+// Bosses that aren't required to beat the game get an "optional" tag.
+const OPTIONAL_CATEGORIES = new Set(['Sinnoh Leaders', 'Mini bosses', 'Trick House', 'Hot House', 'Optional Bosses']);
+const isOptional = (b) => OPTIONAL_CATEGORIES.has(b.category);
 
-// Scaled bosses (no level cap) can't be slotted into a gym phase, so they're grouped by
-// category after the gym progression, in this order.
-const SCALED_ORDER = ['Sinnoh Leaders', 'Rivals', 'Team Aqua', 'Team Magma', 'Mini bosses', 'Trick House', 'Hot House', 'Optional Bosses'];
-const SCALED_LABEL = {
-  'Sinnoh Leaders': 'Sinnoh Gym Leaders', 'Rivals': 'Rivals', 'Team Aqua': 'Team Aqua',
-  'Team Magma': 'Team Magma', 'Mini bosses': 'Mini Bosses', 'Trick House': 'Trick House',
-  'Hot House': 'Hot House', 'Optional Bosses': 'Optional Bosses',
-};
+// Scaled bosses have no level, so estimate a progression point from the team's average base-stat
+// total, calibrated against the capped bosses (weak teams ≈ early game, strong teams ≈ late game).
+const BST_ANCHORS = [[300, 10], [340, 15], [430, 25], [460, 30], [500, 34], [525, 44], [560, 60], [600, 85], [700, 99]];
+function estimateCap(b) {
+  const vals = b.pokemon.map((p) => (p.baseStats ? p.baseStats.reduce((a, c) => a + c, 0) : 0)).filter(Boolean);
+  if (!vals.length) return 50;
+  const bst = vals.reduce((a, c) => a + c, 0) / vals.length;
+  if (bst <= BST_ANCHORS[0][0]) return BST_ANCHORS[0][1];
+  for (let i = 1; i < BST_ANCHORS.length; i++) {
+    if (bst <= BST_ANCHORS[i][0]) {
+      const [x0, y0] = BST_ANCHORS[i - 1], [x1, y1] = BST_ANCHORS[i];
+      return Math.round(y0 + (y1 - y0) * (bst - x0) / (x1 - x0));
+    }
+  }
+  return 99;
+}
+const progressionCap = (b) => (b.levelCap || estimateCap(b));
+
+// Gym windows: a boss belongs to the section of the next gym at/above its progression level.
+const WINDOWS = [
+  [15, 'Up to Gym 1 — Roxanne'], [25, 'Up to Gym 2 — Brawly'], [34, 'Up to Gym 3 — Wattson'],
+  [47, 'Up to Gym 4 — Flannery'], [59, 'Up to Gym 5 — Norman'], [68, 'Up to Gym 6 — Winona'],
+  [76, 'Up to Gym 7 — Tate & Liza'], [82, 'Up to Gym 8 — Juan'], [Infinity, 'Endgame — Victory Road & Elite Four'],
+];
+const windowLabel = (cap) => WINDOWS.find(([max]) => cap <= max)[1];
 
 export default function BossGuide() {
   const { runId } = useParams();
@@ -26,72 +45,50 @@ export default function BossGuide() {
           b.pokemon.some((p) => p.species.toLowerCase().includes(ql)))
       : bosses;
 
-    // Gym/story phases (have a level cap): group by phase, gym leader shown LAST.
-    const phased = new Map();
-    const scaled = new Map();
-    for (const b of filtered) {
-      if (b.phase === 10) {
-        if (!scaled.has(b.category)) scaled.set(b.category, []);
-        scaled.get(b.category).push(b);
-      } else {
-        if (!phased.has(b.phase)) phased.set(b.phase, { label: b.phaseLabel, list: [] });
-        phased.get(b.phase).list.push(b);
-      }
-    }
-    const phasedSecs = [...phased.entries()].sort((a, b) => a[0] - b[0]).map(([, v]) => ({
-      label: v.label,
-      list: v.list.slice().sort((x, y) => (isLeader(x) - isLeader(y)) || (x.order - y.order)),
-    }));
+    const withCap = filtered.map((b) => ({ b, cap: progressionCap(b) }))
+      .sort((x, y) => x.cap - y.cap || isOptional(x.b) - isOptional(y.b));
 
-    // Scaled bosses grouped by category, in a defined order (then any leftovers).
-    const scaledSecs = [];
-    const seen = new Set();
-    for (const cat of SCALED_ORDER) {
-      if (scaled.has(cat)) { scaledSecs.push({ label: SCALED_LABEL[cat] || cat, scaled: true, list: scaled.get(cat).slice().sort((a, b) => a.order - b.order) }); seen.add(cat); }
+    const order = WINDOWS.map(([, label]) => label);
+    const map = new Map();
+    for (const { b, cap } of withCap) {
+      const label = windowLabel(cap);
+      if (!map.has(label)) map.set(label, []);
+      map.get(label).push(b);
     }
-    for (const [cat, list] of scaled) if (!seen.has(cat)) scaledSecs.push({ label: cat, scaled: true, list });
-    if (scaledSecs.length) scaledSecs[0].divider = true;
-    return [...phasedSecs, ...scaledSecs];
+    return order.filter((l) => map.has(l)).map((label) => ({ label, list: map.get(label) }));
   }, [q]);
 
   return (
     <div className="boss-guide">
       <div className="boss-toolbar">
         <input className="search" placeholder="Search boss or Pokémon…" value={q} onChange={(e) => setQ(e.target.value)} />
-        <span className="muted">{bosses.length} bosses · gym order, then scaled bosses by type</span>
+        <span className="muted">{bosses.length} bosses · in progression order (early game → late)</span>
       </div>
 
       {sections.map((sec) => (
-        <div key={sec.label}>
-          {sec.divider && (
-            <div className="scaled-divider">
-              <span>Scaled bosses</span>
-              <p className="muted small">These scale to your level, so they aren't tied to a gym — grouped by type.</p>
-            </div>
-          )}
-          <section className="boss-category">
-            <h2>{sec.label}{sec.scaled && <span className="scaled-tag">scaled</span>}</h2>
-            <div className="boss-cards">
-              {sec.list.map((b) => (
-                <Link key={b.order} to={`/run/${runId}/bosses/${b.order}`} className="boss-card">
-                  <div className="boss-card-head">
-                    <h3>{b.name}</h3>
-                    <span className="card-badges">
-                      {b.weather && <span className="weather-badge" title={`${b.permanentWeather ? 'Permanent ' : ''}${b.weather}`}>{WEATHER_ICON[b.weather] || '🌀'}</span>}
-                      {b.levelCap ? <span className="cap">Lv{b.levelCap}</span> : <span className="cap scaled">scaled</span>}
-                    </span>
-                  </div>
-                  <span className="cat-tag">{b.category}</span>
-                  <div className="boss-team-mini">
-                    {b.pokemon.map((p, i) => (
-                      <span key={i} className={`mini ${p.mega ? 'mega' : ''}`}>{p.species}</span>
-                    ))}
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </section>
-        </div>
+        <section key={sec.label} className="boss-category">
+          <h2>{sec.label}</h2>
+          <div className="boss-cards">
+            {sec.list.map((b) => (
+              <Link key={b.order} to={`/run/${runId}/bosses/${b.order}`} className="boss-card">
+                <div className="boss-card-head">
+                  <h3>{b.name}</h3>
+                  <span className="card-badges">
+                    {isOptional(b) && <span className="opt-badge" title="Optional boss">optional</span>}
+                    {b.weather && <span className="weather-badge" title={`${b.permanentWeather ? 'Permanent ' : ''}${b.weather}`}>{WEATHER_ICON[b.weather] || '🌀'}</span>}
+                    {b.levelCap ? <span className="cap">Lv{b.levelCap}</span> : <span className="cap scaled" title="Scales to your level; position estimated from team strength">~Lv{estimateCap(b)}</span>}
+                  </span>
+                </div>
+                <span className="cat-tag">{b.category}</span>
+                <div className="boss-team-mini">
+                  {b.pokemon.map((p, i) => (
+                    <span key={i} className={`mini ${p.mega ? 'mega' : ''}`}>{p.species}</span>
+                  ))}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
       ))}
     </div>
   );
