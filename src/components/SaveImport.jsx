@@ -5,6 +5,10 @@ import { natureName } from '../data/natures.js';
 import { moveName } from '../lib/dex.js';
 import { buildLocations } from '../data/locations.js';
 
+// House rule: dead Pokémon are stored in the last PC box. The save records each mon's box, so a
+// mon found there is marked dead on import; anything else (party or another box) is alive.
+const DEAD_BOX = 14;
+
 // Suggest a board location id for a parsed mon based on its met-location name.
 function suggestLocation(mon, locations) {
   if (mon.isEgg) return '';
@@ -70,7 +74,7 @@ export default function SaveImport({ run, onClose, onImported }) {
           // update the fields passed). New catches just stay blank for manual entry.
           nature: natureName(m.nature),
           moves: (m.moveIds || []).map(moveName).filter(Boolean),
-          status: 'alive',
+          status: m.box === DEAD_BOX ? 'dead' : 'alive',
           source: 'save',
         });
       }
@@ -110,6 +114,8 @@ export default function SaveImport({ run, onClose, onImported }) {
           hack remaps — rename them on the board. Met locations are read straight from each Pokémon.
           Abilities are randomized per-run and aren't stored in the save, so set each mon's ability
           on the board (the field autocompletes, including Imperium's custom abilities).
+          Pokémon in <strong>PC box {DEAD_BOX}</strong> are imported as <strong>dead</strong>; anything
+          else (party or another box) is alive.
         </p>
 
         {rows && (
@@ -125,6 +131,7 @@ export default function SaveImport({ run, onClose, onImported }) {
                     <div className="imon">
                       <strong>{m.speciesName}</strong>{m.nickname && <em> "{m.nickname}"</em>}
                       {m.shiny && <span className="shiny">✨</span>}{m.isEgg && <span className="egg">EGG</span>}
+                      {m.box === DEAD_BOX && <span className="dead-badge">DEAD (box {DEAD_BOX})</span>}
                       <span className="muted small"> · {m.source}{m.box ? ` box ${m.box}` : ''} · caught Lv{m.metLevel} @ {m.metLocationName}
                         {!m.isEgg && ` · ${natureName(m.nature)}`}</span>
                     </div>
