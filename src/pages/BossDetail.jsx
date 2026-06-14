@@ -1,6 +1,31 @@
 import { Link, useParams } from 'react-router-dom';
 import bosses from '../data/bosses.json';
 import { WEATHER_ICON, STAT_LABELS, statColor, bst } from '../data/bossMeta.js';
+import { findSpeciesLoose } from '../lib/dex.js';
+import { matchups, TYPE_NAMES, TYPE_COLORS } from '../data/typechart.js';
+
+// Type badges + "weak to" list for a boss Pokémon, resolved from its species.
+function MonMatchup({ species, isMega }) {
+  const sp = findSpeciesLoose(species);
+  if (!sp) return null;
+  const { weak } = matchups(sp.t);
+  return (
+    <div className="mon-matchup">
+      <div className="mon-types">
+        {sp.t.map((t) => <span key={t} className="type-badge" style={{ background: TYPE_COLORS[TYPE_NAMES[t]] }}>{TYPE_NAMES[t]}</span>)}
+        {isMega && <span className="approx" title="Base-form typing shown; a Mega's typing may differ">~</span>}
+      </div>
+      {weak.length > 0 && (
+        <div className="mon-weak">
+          <span className="mw-label">Weak</span>
+          {weak.map((w) => (
+            <span key={w.type} className="mw-type" style={{ background: TYPE_COLORS[w.name] }}>{w.name}{w.mult > 2 ? '×4' : ''}</span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function BossDetail() {
   const { runId, order } = useParams();
@@ -31,6 +56,8 @@ export default function BossDetail() {
               <h3>{p.species}{p.mega && <span className="mega-badge">MEGA</span>}</h3>
               <span className="lvl">{p.level ? `Lv ${p.level}` : p.levelText || ''}</span>
             </div>
+            <MonMatchup species={p.species} isMega={p.mega} />
+
             <div className="mon-attrs">
               {p.item && <span className="attr item">@ {p.item}</span>}
               {p.ability && <span className="attr">{p.ability}</span>}

@@ -31,8 +31,8 @@ export function computeStats(p) {
 
 const stageMult = (s) => (s >= 0 ? (2 + s) / 2 : 2 / (2 - s));
 
-// Offensive stat (with boosts + Atk-doubling abilities / choice items).
-function offensiveStat(att, category, crit) {
+// Offensive stat (with boosts + Atk-doubling abilities / choice items + Ruin).
+function offensiveStat(att, category, crit, field) {
   const idx = category === 'phys' ? STAT.atk : STAT.spa;
   const stats = computeStats(att);
   let stat = stats[idx];
@@ -46,6 +46,9 @@ function offensiveStat(att, category, crit) {
   if (att.status && ab === 'Guts' && category === 'phys') m *= 1.5;
   if (att.item === 'Choice Band' && category === 'phys') m *= 1.5;
   if (att.item === 'Choice Specs' && category === 'spec') m *= 1.5;
+  if (field.flowerGift && field.weather === 'sun' && category === 'phys') m *= 1.5;
+  if (category === 'phys' && field.ruinTablets) m *= 0.75; // Tablets of Ruin
+  if (category === 'spec' && field.ruinVessel) m *= 0.75;  // Vessel of Ruin
   return Math.floor(stat * m);
 }
 
@@ -60,8 +63,26 @@ function defensiveStat(def, category, crit, field) {
 
   let m = 1;
   if (category === 'spec' && def.item === 'Assault Vest') m *= 1.5;
-  if (field.sand && def.types?.includes(6 /* Rock */) && category === 'spec') m *= 1.5; // Sandstorm SpD
+  if (field.weather === 'sand' && def.types?.includes(6 /* Rock */) && category === 'spec') m *= 1.5; // Sandstorm SpD
+  if (category === 'phys' && field.ruinSword) m *= 0.75; // Sword of Ruin lowers Def
+  if (category === 'spec' && field.ruinBeads) m *= 0.75; // Beads of Ruin lowers SpD
   return Math.floor(stat * m);
+}
+
+// Is a mon grounded (so terrain affects it)? Flying types and Levitate float.
+function grounded(mon) {
+  return !mon.types?.includes(3 /* Flying */) && mon.ability !== 'Levitate' && mon.item !== 'Air Balloon';
+}
+
+// Terrain power boost (Gen 8 = ×1.3) when the attacker is grounded, plus Misty's Dragon cut.
+function terrainPowerMod(move, att, field) {
+  if (!field.terrain) return 1;
+  if (field.terrain === 'misty' && move.type === 17 /* Dragon */) return 0.5; // affects grounded target
+  if (!grounded(att)) return 1;
+  if (field.terrain === 'electric' && move.type === 14) return 1.3;
+  if (field.terrain === 'grassy' && move.type === 13) return 1.3;
+  if (field.terrain === 'psychic' && move.type === 15) return 1.3;
+  return 1;
 }
 
 // Effective base power after power-modifying abilities/items.
@@ -83,10 +104,11 @@ function stabMultiplier(move, att) {
 }
 
 function weatherPowerMod(move, field) {
-  if (field.weather === 'sun') {
+  const w = field.weather;
+  if (w === 'sun' || w === 'harshsun') {
     if (move.type === 11) return 1.5;   // Fire ↑
-    if (move.type === 12) return 0.5;   // Water ↓
-  } else if (field.weather === 'rain') {
+    if (move.type === 12) return 0.5;   // Water ↓ (water fails entirely under harsh sun — handled separately)
+  } else if (w === 'rain' || w === 'heavyrain') {
     if (move.type === 12) return 1.5;   // Water ↑
     if (move.type === 11) return 0.5;   // Fire ↓
   }
@@ -110,10 +132,17 @@ function finalModifier(move, att, def, eff, field) {
   if (def.ability === 'Thick Fat' && (move.type === 11 || move.type === 16)) m *= 0.5;
   if (def.ability === 'Heatproof' && move.type === 11) m *= 0.5;
   if (def.ability === 'Ice Scales' && category === 'spec') m *= 0.5;
-  // screens (not on a crit)
-  if (!field.crit && ((category === 'phys' && field.reflect) || (category === 'spec' && field.lightScreen))) {
-    m *= 0.5;
-  }
+  // ally support
+  if (field.helpingHand) m *= 1.5;
+  if (field.friendGuard) m *= 0.75;
+  if (field.battery && category === 'spec') m *= 1.3;
+  if (field.powerSpot) m *= 1.3;
+  // screens (not on a crit). Aurora Veil covers both; doubles weakens to ~2/3.
+  const screenMod = field.format === 'doubles' ? 2732 / 4096 : 0.5;
+  const screened = field.auroraVeil
+    || (category === 'phys' && field.reflect)
+    || (category === 'spec' && field.lightScreen);
+  if (!field.crit && screened) m *= screenMod;
   return m;
 }
 
@@ -136,20 +165,29 @@ export function calcDamage({ attacker, defender, move, field = {} }) {
   const defStats = computeStats(defender);
   const maxHP = defStats[0];
 
+  // Primal weather nullifies the opposing element entirely.
+  if ((field.weather === 'harshsun' && move.type === 12) ||
+      (field.weather === 'heavyrain' && move.type === 11)) {
+    return { min: 0, max: 0, minPct: 0, maxPct: 0, eff: 0, maxHP, immune: true, fizzled: true };
+  }
+
   let eff = effectiveness(move.type, defender.types || []);
+  // Strong Winds removes Flying's weaknesses (super-effective hits become neutral).
+  if (field.weather === 'strongwinds' && defender.types?.includes(3) && eff > 1) eff /= 2;
+  if (field.inverse) eff = eff === 0 ? 2 : eff > 1 ? 0.5 : eff < 1 ? 2 : 1;
   if (eff === 0 || abilityImmunity(move, defender) ||
       (defender.ability === 'Wonder Guard' && eff <= 1)) {
     return { min: 0, max: 0, minPct: 0, maxPct: 0, eff: 0, maxHP, immune: true };
   }
 
   const crit = !!field.crit;
-  const A = offensiveStat(attacker, move.c, crit);
+  const A = offensiveStat(attacker, move.c, crit, field);
   const D = defensiveStat(defender, move.c, crit, field);
-  const power = effectivePower(move, attacker);
+  const power = Math.max(1, Math.floor(effectivePower(move, attacker) * terrainPowerMod(move, attacker, field)));
 
   // Base damage.
   let base = Math.floor(Math.floor((Math.floor((2 * attacker.level) / 5 + 2) * power * A) / D) / 50) + 2;
-  if (field.multi) base = pr(base * 0.75);
+  if (field.spread) base = pr(base * 0.75);
   const wMod = weatherPowerMod(move, field);
   if (wMod !== 1) base = pr(base * wMod);
   if (crit) base = Math.floor(base * 1.5);

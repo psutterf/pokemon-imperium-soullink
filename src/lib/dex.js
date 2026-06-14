@@ -22,6 +22,16 @@ export function findSpecies(name) {
   return { id, ...SPECIES[id] };
 }
 
+// Like findSpecies but tolerates form suffixes the species table doesn't carry as their own
+// entry (e.g. "Luxray-Mega", "Pikachu-Libre") by falling back to the base species name.
+// Note: a mega's typing can differ from its base; this returns the base form's types.
+export function findSpeciesLoose(name) {
+  const direct = findSpecies(name);
+  if (direct) return direct;
+  const base = (name || '').split(/[-(]| with /i)[0].trim();
+  return base && base !== name ? findSpecies(base) : null;
+}
+
 export const SPECIES_NAMES = Object.values(SPECIES).map((s) => s.n).sort();
 
 // ability id <-> name

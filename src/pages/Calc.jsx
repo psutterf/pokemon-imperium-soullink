@@ -34,7 +34,13 @@ export default function Calc() {
   const { run } = useRunContext();
   const [att, setAtt] = useState(blankMon);
   const [def, setDef] = useState(blankMon);
-  const [field, setField] = useState({ weather: '', crit: false, reflect: false, lightScreen: false, multi: false, burn: false });
+  const [field, setField] = useState({
+    format: 'singles', weather: '', terrain: '',
+    crit: false, burn: false, spread: false, inverse: false,
+    reflect: false, lightScreen: false, auroraVeil: false,
+    helpingHand: false, friendGuard: false, battery: false, powerSpot: false, flowerGift: false,
+    ruinSword: false, ruinBeads: false, ruinTablets: false, ruinVessel: false,
+  });
 
   const boxMons = useMemo(
     () => run.catches.filter((c) => c.species && findSpecies(c.species)),
@@ -48,11 +54,7 @@ export default function Calc() {
     return calcDamage({
       attacker: a, defender: { ...d, defBoost: def.defBoost, spdBoost: def.spdBoost },
       move: { power: mv.p, type: mv.t, c: mv.c, contact: false },
-      field: {
-        weather: field.weather, crit: field.crit, reflect: field.reflect,
-        lightScreen: field.lightScreen, multi: field.multi, burn: field.burn,
-        sand: field.weather === 'sand',
-      },
+      field,
     });
   }, [att, def, field]);
 
@@ -97,15 +99,49 @@ function Result({ result, move, att, def, field, setField }) {
       )}
 
       <div className="field-conds">
-        <label><select value={field.weather} onChange={(e) => setField((f) => ({ ...f, weather: e.target.value }))}>
-          <option value="">No weather</option><option value="sun">Sun</option><option value="rain">Rain</option>
-          <option value="sand">Sandstorm</option><option value="snow">Snow</option>
+        <h4>Field</h4>
+        <label>Format<select value={field.format} onChange={(e) => setField((f) => ({ ...f, format: e.target.value }))}>
+          <option value="singles">Singles</option><option value="doubles">Doubles</option>
         </select></label>
-        <label className="ck"><input type="checkbox" checked={field.crit} onChange={() => toggle('crit')} /> Critical hit</label>
-        <label className="ck"><input type="checkbox" checked={field.reflect} onChange={() => toggle('reflect')} /> Reflect</label>
-        <label className="ck"><input type="checkbox" checked={field.lightScreen} onChange={() => toggle('lightScreen')} /> Light Screen</label>
-        <label className="ck"><input type="checkbox" checked={field.multi} onChange={() => toggle('multi')} /> Spread move</label>
-        <label className="ck"><input type="checkbox" checked={field.burn} onChange={() => toggle('burn')} /> Attacker burned</label>
+        <label>Weather<select value={field.weather} onChange={(e) => setField((f) => ({ ...f, weather: e.target.value }))}>
+          <option value="">None</option><option value="sun">Sun</option><option value="rain">Rain</option>
+          <option value="sand">Sandstorm</option><option value="snow">Snow/Hail</option>
+          <option value="harshsun">Harsh Sunshine</option><option value="heavyrain">Heavy Rain</option>
+          <option value="strongwinds">Strong Winds</option>
+        </select></label>
+        <label>Terrain<select value={field.terrain} onChange={(e) => setField((f) => ({ ...f, terrain: e.target.value }))}>
+          <option value="">None</option><option value="electric">Electric</option><option value="grassy">Grassy</option>
+          <option value="misty">Misty</option><option value="psychic">Psychic</option>
+        </select></label>
+
+        <div className="fc-group">
+          <span className="fc-head">Screens (on defender)</span>
+          <label className="ck"><input type="checkbox" checked={field.reflect} onChange={() => toggle('reflect')} /> Reflect</label>
+          <label className="ck"><input type="checkbox" checked={field.lightScreen} onChange={() => toggle('lightScreen')} /> Light Screen</label>
+          <label className="ck"><input type="checkbox" checked={field.auroraVeil} onChange={() => toggle('auroraVeil')} /> Aurora Veil</label>
+        </div>
+        <div className="fc-group">
+          <span className="fc-head">Support</span>
+          <label className="ck"><input type="checkbox" checked={field.helpingHand} onChange={() => toggle('helpingHand')} /> Helping Hand</label>
+          <label className="ck"><input type="checkbox" checked={field.friendGuard} onChange={() => toggle('friendGuard')} /> Friend Guard</label>
+          <label className="ck"><input type="checkbox" checked={field.battery} onChange={() => toggle('battery')} /> Battery</label>
+          <label className="ck"><input type="checkbox" checked={field.powerSpot} onChange={() => toggle('powerSpot')} /> Power Spot</label>
+          <label className="ck"><input type="checkbox" checked={field.flowerGift} onChange={() => toggle('flowerGift')} /> Flower Gift</label>
+        </div>
+        <div className="fc-group">
+          <span className="fc-head">Ruin abilities</span>
+          <label className="ck"><input type="checkbox" checked={field.ruinSword} onChange={() => toggle('ruinSword')} /> Sword of Ruin</label>
+          <label className="ck"><input type="checkbox" checked={field.ruinBeads} onChange={() => toggle('ruinBeads')} /> Beads of Ruin</label>
+          <label className="ck"><input type="checkbox" checked={field.ruinTablets} onChange={() => toggle('ruinTablets')} /> Tablets of Ruin</label>
+          <label className="ck"><input type="checkbox" checked={field.ruinVessel} onChange={() => toggle('ruinVessel')} /> Vessel of Ruin</label>
+        </div>
+        <div className="fc-group">
+          <span className="fc-head">Other</span>
+          <label className="ck"><input type="checkbox" checked={field.crit} onChange={() => toggle('crit')} /> Critical hit</label>
+          <label className="ck"><input type="checkbox" checked={field.burn} onChange={() => toggle('burn')} /> Attacker burned</label>
+          <label className="ck"><input type="checkbox" checked={field.spread} onChange={() => toggle('spread')} /> Spread move</label>
+          <label className="ck"><input type="checkbox" checked={field.inverse} onChange={() => toggle('inverse')} /> Inverse battle</label>
+        </div>
       </div>
     </div>
   );
