@@ -14,21 +14,27 @@ full **boss battle guide**. Built with React + Vite, with optional live 2-player
   Designed for **randomized** runs, where a static encounter dex doesn't apply. Reads
   Ruby/Sapphire/Emerald-family saves (including Imperium); a non-Emerald save such as
   FireRed/LeafGreen is detected and rejected with a clear message instead of importing garbage.
-- **Boss Guide** — all 131 bosses (gym leaders, Sinnoh leaders, rivals, Elite 4, Aqua/Magma,
-  mini-bosses, optional bosses), **ordered by where you are in the game** (which gym you're up to).
-  Each boss shows full teams with level, ability, item, nature, IVs/EVs, moves, megas, **base
-  stats**, level caps, and a **permanent-weather** badge (Sun/Rain/Sand/Snow) where the team sets it.
+- **Boss Guide** — all 131 bosses grouped **by gym section**: each section lists the fights
+  leading up to a gym, with the **gym leader shown last**, followed by Post-Gym 8 / Victory Road,
+  the Elite Four, and then the level-scaled bosses grouped by type (Sinnoh leaders, rivals,
+  mini-bosses, Trick/Hot House, optional). Each boss shows full teams with level, ability, item,
+  nature, IVs/EVs, moves, megas, **base stats**, **per-Pokémon typing and weaknesses**, level caps,
+  and a **permanent-weather** badge where the team sets it.
 - **Per-Pokémon detail** — click any caught mon for its typing, base-stat bars (with nature
   arrows), ability, and full **type weaknesses / resistances / immunities**. Track **ability** and
-  **nature** on each catch (auto-filled from the save).
+  **nature** per catch. Nature auto-fills from the save; ability is entered manually with
+  autocomplete (Imperium randomizes abilities per-run via a seed that isn't saved, so it can't be
+  read from the file — the autocomplete includes Imperium's custom abilities).
 - **Search, sort & tag filters** — search the board by species / nickname / ability, **sort by any
   base stat** (find your hardest hitter), and filter to **weather setters** or **stat changers**
   (Intimidate, the Ruin abilities, etc.). Every filter keeps the linked partner in view.
 - **Team builder** — star up to 6 linked pairs; pick your six and your partner's six are decided
   automatically (with warnings when a partner slot is empty, boxed, or dead).
-- **Damage calculator** — a Gen-8 calc (STAB, type effectiveness, weather, EVs/IVs/nature, stat
-  stages, crit, screens, burn, common items & abilities) that **auto-fills either side from your
-  boxes or any boss team**, so you can plan fights in seconds.
+- **Damage calculator** — a Gen-8 calc with a full **field section** (format, weather incl.
+  harsh sun / heavy rain / strong winds, terrain, all three screens, Helping Hand / Friend Guard /
+  Battery / Power Spot / Flower Gift, the four Ruin abilities, inverse battle) plus STAB, type
+  effectiveness, EVs/IVs/nature, stat stages, crit, burn, and common items/abilities. **Auto-fills
+  either side from your boxes or any boss team**, so you can plan fights in seconds.
 - **Configurable Fallarbor eggs** — set how many starter eggs (3–9+) your run registers; the board
   generates that many egg rows.
 
