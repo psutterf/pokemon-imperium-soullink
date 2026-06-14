@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { parseSave } from '../lib/saveParser.js';
 import { store } from '../lib/store.js';
-import { abilityForSpeciesId } from '../lib/dex.js';
 import { natureName } from '../data/natures.js';
 import { buildLocations } from '../data/locations.js';
 
@@ -64,7 +63,10 @@ export default function SaveImport({ run, onClose, onImported }) {
           species: m.speciesName,
           nickname: m.nickname || '',
           level: m.level || m.metLevel || null,
-          ability: m.isEgg ? '' : abilityForSpeciesId(m.species, m.abilityNum),
+          // Imperium randomizes abilities per-run via a seed that isn't written to the save,
+          // so we can't recover the in-game ability here — leave it blank for quick manual
+          // entry (the ability field autocompletes, including Imperium's custom abilities).
+          ability: '',
           nature: natureName(m.nature),
           status: 'alive',
           source: 'save',
@@ -104,6 +106,8 @@ export default function SaveImport({ run, onClose, onImported }) {
         <p className="muted small">
           Tip: save in your emulator first. Species shown as <code>#NNN</code> are Gen 3–9 mons this
           hack remaps — rename them on the board. Met locations are read straight from each Pokémon.
+          Abilities are randomized per-run and aren't stored in the save, so set each mon's ability
+          on the board (the field autocompletes, including Imperium's custom abilities).
         </p>
 
         {rows && (
@@ -120,7 +124,7 @@ export default function SaveImport({ run, onClose, onImported }) {
                       <strong>{m.speciesName}</strong>{m.nickname && <em> "{m.nickname}"</em>}
                       {m.shiny && <span className="shiny">✨</span>}{m.isEgg && <span className="egg">EGG</span>}
                       <span className="muted small"> · {m.source}{m.box ? ` box ${m.box}` : ''} · caught Lv{m.metLevel} @ {m.metLocationName}
-                        {!m.isEgg && ` · ${natureName(m.nature)} · ${abilityForSpeciesId(m.species, m.abilityNum)}`}</span>
+                        {!m.isEgg && ` · ${natureName(m.nature)}`}</span>
                     </div>
                     <select value={r.locationId}
                       onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, locationId: e.target.value } : x))}>

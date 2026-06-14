@@ -153,7 +153,12 @@ button.danger { background: var(--danger); color: #fff; border: none; border-rad
 /* ---------- Boss guide ---------- */
 .boss-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .boss-toolbar .search { width: 320px; max-width: 60%; }
-.boss-category h2 { font-size: 16px; border-bottom: 1px solid var(--line); padding-bottom: 6px; margin: 22px 0 12px; }
+.boss-category h2 { font-size: 16px; border-bottom: 1px solid var(--line); padding-bottom: 6px; margin: 22px 0 12px; display: flex; align-items: center; gap: 10px; }
+.scaled-tag { font-size: 10px; font-weight: 400; color: var(--muted); background: var(--bg3); border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; }
+.scaled-divider { margin: 34px 0 4px; }
+.scaled-divider span { font-size: 18px; font-weight: 800; }
+.scaled-divider p { margin: 4px 0 0; }
+.cap.scaled { color: var(--muted); }
 .boss-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
 .boss-card { background: var(--bg2); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; display: block; color: var(--text); }
 .boss-card:hover { border-color: var(--accent2); }
