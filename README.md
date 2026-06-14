@@ -14,12 +14,12 @@ full **boss battle guide**. Built with React + Vite, with optional live 2-player
   Designed for **randomized** runs, where a static encounter dex doesn't apply. Reads
   Ruby/Sapphire/Emerald-family saves (including Imperium); a non-Emerald save such as
   FireRed/LeafGreen is detected and rejected with a clear message instead of importing garbage.
-- **Boss Guide** — all 131 bosses grouped **by gym section**: each section lists the fights
-  leading up to a gym, with the **gym leader shown last**, followed by Post-Gym 8 / Victory Road,
-  the Elite Four, and then the level-scaled bosses grouped by type (Sinnoh leaders, rivals,
-  mini-bosses, Trick/Hot House, optional). Each boss shows full teams with level, ability, item,
-  nature, IVs/EVs, moves, megas, **base stats**, **per-Pokémon typing and weaknesses**, level caps,
-  and a **permanent-weather** badge where the team sets it.
+- **Boss Guide** — all 131 bosses in **progression order** (early game → late). Level-capped
+  bosses sit at their cap; level-scaled bosses are placed by estimating a progression point from
+  team strength, so mini-bosses and optional bosses interleave into roughly where you meet them.
+  **Optional** bosses are tagged, and **permanent-weather** badges are kept. Each boss shows full
+  teams with level, ability, item, nature, IVs/EVs, moves, megas, **base stats**, and **per-Pokémon
+  typing and weaknesses**.
 - **Per-Pokémon detail** — click any caught mon for its typing, base-stat bars (with nature
   arrows), ability, and full **type weaknesses / resistances / immunities**. Track **ability** and
   **nature** per catch. Nature auto-fills from the save; ability is entered manually with
@@ -33,8 +33,10 @@ full **boss battle guide**. Built with React + Vite, with optional live 2-player
 - **Damage calculator** — a Gen-8 calc with a full **field section** (format, weather incl.
   harsh sun / heavy rain / strong winds, terrain, all three screens, Helping Hand / Friend Guard /
   Battery / Power Spot / Flower Gift, the four Ruin abilities, inverse battle) plus STAB, type
-  effectiveness, EVs/IVs/nature, stat stages, crit, burn, and common items/abilities. **Auto-fills
-  either side from your boxes or any boss team**, so you can plan fights in seconds.
+  effectiveness, EVs/IVs/nature, stat stages, crit, burn, and common items/abilities. Add **up to
+  four moves per side** and see the damage **both ways**. **Auto-fills either side — species,
+  spread, ability, item, and moves — from your boxes or any boss team**, so you can plan fights in
+  seconds.
 - **Configurable Fallarbor eggs** — set how many starter eggs (3–9+) your run registers; the board
   generates that many egg rows.
 
@@ -67,9 +69,10 @@ Run these after a game update (they read the ROM / official sheet and regenerate
 - `npm run validate-save -- "C:/path/to/your.sav"` — dump a save's party + boxes to the console.
 
 ## Database migration (existing Supabase projects)
-The ability/nature, egg-count and team features add columns. On an **existing** project, run
-[`supabase/migration-002.sql`](supabase/migration-002.sql) in the SQL editor once. New projects get
-everything from `supabase/schema.sql`. (Local mode needs no migration.)
+On an **existing** project, run the migrations in `supabase/` once each in the SQL editor, in order:
+[`migration-002.sql`](supabase/migration-002.sql) (ability/nature, egg count, team) and
+[`migration-003.sql`](supabase/migration-003.sql) (per-catch moves, for the damage calc). New
+projects get everything from `supabase/schema.sql`. (Local mode needs no migration.)
 
 ## Notes
 - **Species names + stats** are extracted directly from the Imperium ROM (`gSpeciesInfo`), so they
