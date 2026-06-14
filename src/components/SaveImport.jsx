@@ -64,10 +64,10 @@ export default function SaveImport({ run, onClose, onImported }) {
           species: m.speciesName,
           nickname: m.nickname || '',
           level: m.level || m.metLevel || null,
-          // Imperium randomizes abilities per-run via a seed that isn't written to the save,
-          // so we can't recover the in-game ability here — leave it blank for quick manual
-          // entry (the ability field autocompletes, including Imperium's custom abilities).
-          ability: '',
+          // Ability is intentionally NOT set here. Imperium randomizes abilities per-run via a
+          // seed that isn't in the save, so it's entered manually — and omitting it from the
+          // upsert means a re-sync won't wipe an ability you already typed (both stores only
+          // update the fields passed). New catches just stay blank for manual entry.
           nature: natureName(m.nature),
           moves: (m.moveIds || []).map(moveName).filter(Boolean),
           status: 'alive',
