@@ -9,6 +9,11 @@ import { buildLocations } from '../data/locations.js';
 // mon found there is marked dead on import; anything else (party or another box) is alive.
 const DEAD_BOX = 14;
 
+// Fallarbor Town sells unlimited starter eggs, and every one of them is met at "Fallarbor Town".
+// Met location alone therefore can't tell two starter eggs apart, so they can't be matched to a
+// specific egg row by name — they must be spread across the rows in order (see buildRows).
+const isFallarborEgg = (mon) => /fallarbor/i.test(mon.metLocationName || '');
+
 // Suggest a board location id for a parsed mon based on its met-location name.
 function suggestLocation(mon, locations) {
   if (mon.isEgg) return '';
@@ -25,6 +30,29 @@ function suggestLocation(mon, locations) {
   return partial?.id || '';
 }
 
+// Build the editable import rows, assigning each mon a board location. Fallarbor starter eggs are
+// handed out across the Fallarbor egg rows (#1, #2, #3, …) in the order they appear in the save, so
+// every egg lands on its own row instead of all colliding on row #1. Everything else falls back to
+// met-location matching. If there are more eggs than egg rows, the extras are left unassigned (the
+// player can raise the egg count on the board, then re-sync).
+const FALLARBOR_EGG_PREFIX = 'fallarbor-starter-egg';
+function buildRows(mons, locations) {
+  const eggRowIds = locations
+    .filter((l) => l.id === FALLARBOR_EGG_PREFIX || l.id.startsWith(`${FALLARBOR_EGG_PREFIX}-`))
+    .map((l) => l.id);
+  let nextEgg = 0;
+  return mons.map((mon, i) => {
+    let locationId;
+    if (isFallarborEgg(mon)) {
+      locationId = eggRowIds[nextEgg] || '';
+      nextEgg += 1;
+    } else {
+      locationId = suggestLocation(mon, locations);
+    }
+    return { key: i, mon, include: true, locationId };
+  });
+}
+
 export default function SaveImport({ run, onClose, onImported }) {
   const [slot, setSlot] = useState(1);
   const [rows, setRows] = useState(null);
@@ -39,12 +67,7 @@ export default function SaveImport({ run, onClose, onImported }) {
       const buf = new Uint8Array(await file.arrayBuffer());
       const { all } = parseSave(buf);
       if (!all.length) { setErr('No Pokémon found in that save (party and boxes are empty).'); return; }
-      setRows(all.map((m, i) => ({
-        key: i,
-        mon: m,
-        include: true,
-        locationId: suggestLocation(m, LOCATIONS),
-      })));
+      setRows(buildRows(all, LOCATIONS));
     } catch (e) {
       setErr(e.message);
     }
