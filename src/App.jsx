@@ -11,6 +11,7 @@ const BossGuide = lazy(() => import('./pages/BossGuide.jsx'));
 const BossDetail = lazy(() => import('./pages/BossDetail.jsx'));
 const Calc = lazy(() => import('./pages/Calc.jsx'));
 const Rewards = lazy(() => import('./pages/Rewards.jsx'));
+const Wheel = lazy(() => import('./pages/Wheel.jsx'));
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="bosses/:order" element={<BossDetail />} />
           <Route path="calc" element={<Calc />} />
           <Route path="rewards" element={<Rewards />} />
+          <Route path="wheel" element={<Wheel />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

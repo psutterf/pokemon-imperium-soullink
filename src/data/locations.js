@@ -107,4 +107,5 @@ export const LOCATION_TYPES = {
   fossil: { label: 'Fossil', color: '#7a7a7a' },
   legendary: { label: 'Legendary', color: '#8e5bc0' },
   static: { label: 'Starter', color: '#4f9e8a' },
+  reward: { label: 'Reward', color: '#c79b3b' }, // manually-added reward pairs (not a game location)
 };

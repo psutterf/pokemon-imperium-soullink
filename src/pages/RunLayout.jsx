@@ -28,6 +28,7 @@ export default function RunLayout() {
           <NavLink to={`/run/${runId}/bosses`}>Boss Guide</NavLink>
           <NavLink to={`/run/${runId}/calc`}>Damage Calc</NavLink>
           <NavLink to={`/run/${runId}/rewards`}>Rewards</NavLink>
+          <NavLink to={`/run/${runId}/wheel`}>Wheel</NavLink>
         </nav>
       </header>
       <main className="run-main">

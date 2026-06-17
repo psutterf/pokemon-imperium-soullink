@@ -13,6 +13,7 @@ import TeamPanel from '../components/TeamPanel.jsx';
 const SaveImport = lazy(() => import('../components/SaveImport.jsx'));
 
 const TEAM_MAX = 6;
+const uid = () => (crypto.randomUUID?.() || Date.now().toString(36) + Math.random().toString(36).slice(2));
 
 export default function Board() {
   const { run, reload } = useRunContext();
@@ -20,9 +21,15 @@ export default function Board() {
   const [query, setQuery] = useState('');
   const [statSort, setStatSort] = useState(''); // '' or stat index 0-5
   const [tagFilter, setTagFilter] = useState(() => new Set());
+  const [pairName, setPairName] = useState(''); // draft name for a new manual reward pair
   const players = run.players;
 
-  const locations = useMemo(() => buildLocations(run.egg_count), [run.egg_count]);
+  // Built-in game locations + any manually-added "reward" pairs (rewards you create, not on the map).
+  const customLocations = useMemo(() => run.custom_locations || [], [run.custom_locations]);
+  const locations = useMemo(
+    () => [...buildLocations(run.egg_count), ...customLocations],
+    [run.egg_count, customLocations],
+  );
   const team = run.team || [];
 
   const catchMap = useMemo(() => {
@@ -40,6 +47,20 @@ export default function Board() {
     reload();
   };
   const setEggCount = (n) => store.updateRun(run.id, { egg_count: Math.max(1, Math.min(24, n)) }).then(reload);
+
+  const addPair = async () => {
+    const name = pairName.trim();
+    if (!name) return;
+    const loc = { id: `reward-${uid()}`, name, type: 'reward' };
+    await store.updateRun(run.id, { custom_locations: [...customLocations, loc] });
+    setPairName('');
+    reload();
+  };
+  const removePair = async (locId) => {
+    await Promise.all([store.deleteCatch(run.id, `${locId}:1`), store.deleteCatch(run.id, `${locId}:2`)]);
+    await store.updateRun(run.id, { custom_locations: customLocations.filter((l) => l.id !== locId) });
+    store.updateRun(run.id, { team: (run.team || []).filter((x) => x !== locId) }).then(reload);
+  };
   const toggleTeam = (locId) => {
     const next = team.includes(locId) ? team.filter((x) => x !== locId)
       : team.length >= TEAM_MAX ? team : [...team, locId];
@@ -110,6 +131,12 @@ export default function Board() {
           </span>
           <span className="stat">{stats.linked} linked pairs</span>
           <span className="stat dead">{stats.deaths} deaths</span>
+          <span className="add-pair" title="Add a manual reward pair (e.g. a wheel prize) not tied to a map location">
+            <input className="pair-input" placeholder="New reward pair name…" value={pairName}
+              onChange={(e) => setPairName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addPair()} />
+            <button onClick={addPair} disabled={!pairName.trim()}>+ Add pair</button>
+          </span>
           <button className="primary" onClick={() => setImporting(true)}>⤓ Sync save</button>
         </div>
       </div>
@@ -166,6 +193,9 @@ export default function Board() {
                     <span className="loc-badge" style={{ background: lt.color }}>{lt.label}</span>
                     <span className="loc-name">{loc.name}</span>
                     {loc.note && <span className="loc-note" title={loc.note}>ⓘ</span>}
+                    {loc.type === 'reward' && (
+                      <button className="pair-x" title="Remove this reward pair" onClick={() => removePair(loc.id)}>×</button>
+                    )}
                     {stat != null && <span className="stat-pill">{STAT_LABELS[Number(statSort)]} {stat}</span>}
                   </td>
                   <td><CatchCell value={c1} onSave={(f) => saveCatch(loc, 1, f)} onClear={() => clearCatch(loc, 1)} /></td>

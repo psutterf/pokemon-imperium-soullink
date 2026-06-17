@@ -2,6 +2,7 @@
 // stored "catch" into a full record (types, base stats, ability) for detail views, filters,
 // and the damage calculator.
 import { SPECIES } from '../data/species.js';
+import { FORM_NAMES } from '../data/forms.js';
 import { ABILITIES } from '../data/abilities.js';
 import { MOVES } from '../data/moves.js';
 import { TYPE_NAMES } from '../data/typechart.js';
@@ -14,6 +15,10 @@ for (const [id, sp] of Object.entries(SPECIES)) {
   const k = norm(sp.n);
   if (!(k in SPECIES_BY_NAME)) SPECIES_BY_NAME[k] = +id;
 }
+// Mega/Primal forms share their base name in the ROM (Primal Groudon is "Groudon" #955), so the
+// loop above maps "groudon" to the base form. Register the readable form labels too, so a catch or
+// calc entry typed "Primal Groudon"/"Mega Charizard X" resolves to the FORM's own stats/types.
+for (const [id, label] of Object.entries(FORM_NAMES)) SPECIES_BY_NAME[norm(label)] = +id;
 
 export function findSpecies(name) {
   if (!name) return null;
@@ -32,7 +37,11 @@ export function findSpeciesLoose(name) {
   return base && base !== name ? findSpecies(base) : null;
 }
 
-export const SPECIES_NAMES = Object.values(SPECIES).map((s) => s.n).sort();
+// Datalist for manual catch entry: base species names + the readable Mega/Primal labels (deduped),
+// so "Primal Groudon" etc. can be picked directly rather than an indistinguishable second "Groudon".
+export const SPECIES_NAMES = [
+  ...new Set([...Object.values(SPECIES).map((s) => s.n), ...Object.values(FORM_NAMES)]),
+].sort();
 
 // ability id <-> name
 export const ABILITY_NAMES = Object.values(ABILITIES).sort();

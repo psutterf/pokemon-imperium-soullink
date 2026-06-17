@@ -11,6 +11,8 @@ create table if not exists runs (
   randomized  boolean not null default true,
   egg_count   int  not null default 6,   -- Fallarbor starter eggs to register
   team        jsonb not null default '[]'::jsonb, -- soul-link team: up to 6 location ids
+  custom_locations jsonb not null default '[]'::jsonb, -- manually-added reward pair rows
+  wheel       jsonb not null default '[]'::jsonb, -- prize-wheel segments (empty => seeded defaults)
   tokens      jsonb not null default '{"1":{"nav":0,"reroll":0},"2":{"nav":0,"reroll":0}}',
   players     jsonb not null default '[{"slot":1,"name":"Player 1"},{"slot":2,"name":"Player 2"}]',
   created_at  timestamptz not null default now()

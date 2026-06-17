@@ -52,7 +52,7 @@ const localStore = {
   async createRun({ name, randomized, p1, p2, eggCount }) {
     let code = makeCode();
     while (localStorage.getItem(LCODE(code))) code = makeCode();
-    const run = { id: uid(), name, join_code: code, randomized: !!randomized, egg_count: eggCount ?? 6, team: [], tokens: emptyTokens() };
+    const run = { id: uid(), name, join_code: code, randomized: !!randomized, egg_count: eggCount ?? 6, team: [], custom_locations: [], wheel: [], tokens: emptyTokens() };
     const doc = {
       run,
       players: [
