@@ -75,14 +75,17 @@ export default function CatchCell({ value, onSave, onClear }) {
   const abilitySuggestions = [...new Set([...speciesAbilities(draft.species), ...ABILITY_NAMES])];
   return (
     <div className="cell editing">
-      <input ref={ref} list={`${uid}-sp`} placeholder="Species" value={draft.species || ''}
+      {/* autoComplete="off" disables the BROWSER's saved-value dropdown (which otherwise surfaces
+          abilities/species typed in other runs — "bleeding" into new runs). The app's own datalist
+          suggestions (game ability/species names) still work. */}
+      <input ref={ref} list={`${uid}-sp`} autoComplete="off" placeholder="Species" value={draft.species || ''}
         onChange={(e) => setDraft({ ...draft, species: e.target.value })}
         onKeyDown={(e) => e.key === 'Enter' && commit()} />
       <datalist id={`${uid}-sp`}>{SPECIES_NAMES.map((s) => <option key={s} value={s} />)}</datalist>
-      <input placeholder="Nickname" value={draft.nickname || ''}
+      <input placeholder="Nickname" autoComplete="off" value={draft.nickname || ''}
         onChange={(e) => setDraft({ ...draft, nickname: e.target.value })}
         onKeyDown={(e) => e.key === 'Enter' && commit()} />
-      <input list={`${uid}-ab`} placeholder="Ability" value={draft.ability || ''}
+      <input list={`${uid}-ab`} autoComplete="off" placeholder="Ability" value={draft.ability || ''}
         onChange={(e) => setDraft({ ...draft, ability: e.target.value })}
         onKeyDown={(e) => e.key === 'Enter' && commit()} />
       <datalist id={`${uid}-ab`}>{abilitySuggestions.map((a) => <option key={a} value={a} />)}</datalist>
