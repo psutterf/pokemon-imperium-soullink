@@ -18,8 +18,11 @@ const byName = (a, b) => a.name.localeCompare(b.name) || a.id - b.id;
 const SPECIES_OPTS = Object.entries(SPECIES)
   .map(([id, sp]) => ({ id: +id, name: FORM_NAMES[id] || sp.n, sub: `${typeStr(sp.t)} · BST ${bst(sp.s)}` }))
   .sort(byName);
+// TMs show + match by the move they teach ("TM35 — Flamethrower"); unused TM slots (no move) are hidden.
 const ITEM_OPTS = Object.entries(ITEMS)
-  .map(([id, it]) => ({ id: +id, name: it.n, sub: it.pk })).sort(byName);
+  .filter(([, it]) => !(it.pk === 'tm' && !it.mv))
+  .map(([id, it]) => ({ id: +id, name: it.mv ? `${it.n} — ${it.mv}` : it.n, sub: it.pk }))
+  .sort(byName);
 const MOVE_OPTS = Object.entries(MOVES)
   .map(([id, m]) => ({ id: +id, name: m.n, sub: `${TYPE_NAMES[m.t] || ''} · ${m.c} · ${m.p || '—'}` })).sort(byName);
 
@@ -118,6 +121,10 @@ export default function Rewards() {
       {/* ---- 2. Items ---- */}
       <section className="rw-card">
         <h2>2 · Items</h2>
+        <p className="rw-hint muted small">
+          Includes <strong>TMs</strong> — search by the move (e.g. <em>“Flamethrower”</em>) or by number
+          (<em>“TM35”</em>); they're routed to the bag's TM pocket automatically.
+        </p>
         {items.map((it, i) => (
           <div className="rw-row" key={it.key}>
             <Autocomplete
