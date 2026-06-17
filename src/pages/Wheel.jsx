@@ -7,6 +7,14 @@ const uid = () => (crypto.randomUUID?.() || Date.now().toString(36) + Math.rando
 const SPIN_TURNS = 5;          // full rotations before landing
 const SPIN_MS = 4200;          // matches the CSS transition duration
 
+// The wheels, each backed by its own synced run column. Wheel 1 seeds editable defaults; Wheel 2
+// starts empty (the players fill it in).
+const WHEELS = [
+  { key: 'wheel', name: 'Wheel 1', seed: true },
+  { key: 'wheel2', name: 'Wheel 2', seed: false },
+];
+const EMPTY = [];   // stable reference for a non-seeded, unfilled wheel
+
 // Point on a circle at `deg` clockwise from the top (12 o'clock).
 const pt = (deg, r, cx = 100, cy = 100) => {
   const a = (deg - 90) * (Math.PI / 180);
@@ -15,8 +23,16 @@ const pt = (deg, r, cx = 100, cy = 100) => {
 
 export default function Wheel() {
   const { run, reload } = useRunContext();
-  // Synced segments; until anyone edits, both players see the same seeded defaults.
-  const rewards = run.wheel?.length ? run.wheel : DEFAULT_WHEEL;
+
+  const [wheelIdx, setWheelIdx] = useState(0);
+  const active = WHEELS[wheelIdx];
+  // Synced segments for the active wheel. Wheel 1 falls back to seeded defaults until edited;
+  // Wheel 2 (and any non-seeded wheel) starts empty.
+  const stored = run[active.key];
+  const rewards = useMemo(
+    () => (stored?.length ? stored : (active.seed ? DEFAULT_WHEEL : EMPTY)),
+    [stored, active],
+  );
 
   const [rotation, setRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
@@ -24,6 +40,14 @@ export default function Wheel() {
   const [history, setHistory] = useState([]);   // recent spins (ephemeral, local)
   const [editing, setEditing] = useState(false);
   const idxRef = useRef(0);
+
+  const switchWheel = (i) => {
+    if (i === wheelIdx || spinning) return;
+    setWheelIdx(i);
+    setResult(null);
+    setHistory([]);
+    setEditing(false);
+  };
 
   const seg = rewards.length ? 360 / rewards.length : 360;
 
@@ -59,9 +83,9 @@ export default function Wheel() {
     setHistory((h) => [{ key: uid(), label: won.label, at: Date.now() }, ...h].slice(0, 8));
   };
 
-  // --- editing (persists the whole array to the run) ---
-  const save = (next) => store.updateRun(run.id, { wheel: next }).then(reload);
-  const editStart = () => { if (!run.wheel?.length) save(DEFAULT_WHEEL); setEditing(true); };
+  // --- editing (persists the whole array to the active wheel's column) ---
+  const save = (next) => store.updateRun(run.id, { [active.key]: next }).then(reload);
+  const editStart = () => { if (active.seed && !stored?.length) save(DEFAULT_WHEEL); setEditing(true); };
   const upSeg = (i, patch) => save(rewards.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const addSeg = () => save([...rewards, { id: uid(), label: 'New reward', color: WHEEL_PALETTE[rewards.length % WHEEL_PALETTE.length] }]);
   const removeSeg = (i) => save(rewards.filter((_, j) => j !== i));
@@ -70,10 +94,17 @@ export default function Wheel() {
   return (
     <div className="wheel-page">
       <p className="rw-intro muted">
-        Spin for a random reward. The list is <strong>shared with your partner</strong> and fully
+        Spin for a random reward. Each wheel is <strong>shared with your partner</strong> and fully
         editable — rename, recolor, add, or remove rewards. A spin just picks one; carry it out yourself
         (spawn it in <strong>Rewards</strong>, or log it as a new pair on the <strong>Board</strong>).
       </p>
+
+      <div className="wheel-tabs">
+        {WHEELS.map((w, i) => (
+          <button key={w.key} className={`wheel-tab ${i === wheelIdx ? 'on' : ''}`}
+            onClick={() => switchWheel(i)} disabled={spinning}>{w.name}</button>
+        ))}
+      </div>
 
       <div className="wheel-layout">
         <div className="wheel-stage">
