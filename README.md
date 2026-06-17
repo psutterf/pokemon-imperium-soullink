@@ -41,6 +41,13 @@ full **boss battle guide**. Built with React + Vite, with optional live 2-player
   seconds.
 - **Configurable Fallarbor eggs** — set how many starter eggs (3–9+) your run registers; the board
   generates that many egg rows.
+- **Rewards (save editor)** — upload your `.sav` and spawn **bag items** (any quantity, routed to the
+  right pocket) and **Pokémon** into your PC boxes, then download the edited save. Spawned Pokémon
+  arrive at **Level 1**, neutral nature, knowing only the moves you choose (Tackle by default), so they
+  never have an illegal moveset. 100% in your browser — the save never leaves your machine. Close your
+  emulator first, swap in the downloaded file (keep the original as a backup), and withdraw each spawned
+  Pokémon from the PC once to finalize its stats. (Ability selection isn't available — this build
+  randomizes abilities at runtime, so a save edit can't set them.)
 
 ## Run it
 ```bash
@@ -66,9 +73,13 @@ Run these after a game update (they read the ROM / official sheet and regenerate
 - `npm run extract-gamedata -- "C:/path/to/Imperium.gba"` — pull every species' name, base stats,
   **types and abilities** plus the **ability-name** and **move** tables from the ROM into
   `src/data/{species,abilities,moves}.js`. (Supersedes `extract-species`, which only did names+stats.)
+- `node scripts/extract-items.mjs "C:/path/to/Imperium.gba"` — pull the item table (id → name + bag
+  pocket) into `src/data/items.js`, used by the Rewards save editor.
 - `npm run import-bosses` — re-pull the official Boss Battles Google Sheet into `src/data/bosses.json`
   (also attaches base stats + weather + progression phase; run *after* extract-gamedata).
 - `npm run validate-save -- "C:/path/to/your.sav"` — dump a save's party + boxes to the console.
+- `node scripts/test-save-editor.mjs` — validate the Rewards save editor against a real save (dry-run;
+  add `--apply` to actually edit the save after a timestamped backup).
 
 ## Database migration (existing Supabase projects)
 On an **existing** project, run the migrations in `supabase/` once each in the SQL editor, in order:
