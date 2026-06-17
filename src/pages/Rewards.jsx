@@ -3,6 +3,7 @@ import Autocomplete from '../components/Autocomplete.jsx';
 import { parseSave } from '../lib/saveParser.js';
 import { loadSave, applyEdits, serializeSave } from '../lib/saveEditor.js';
 import { SPECIES } from '../data/species.js';
+import { FORM_NAMES } from '../data/forms.js';
 import { ITEMS } from '../data/items.js';
 import { MOVES } from '../data/moves.js';
 import { TYPE_NAMES } from '../data/typechart.js';
@@ -12,8 +13,10 @@ const bst = (s) => (s || []).reduce((a, b) => a + b, 0);
 const typeStr = (t) => (t || []).map((id) => TYPE_NAMES[id]).filter(Boolean).join('/');
 const byName = (a, b) => a.name.localeCompare(b.name) || a.id - b.id;
 
+// Mega/Primal forms share their base name in the ROM (Primal Groudon is "Groudon" #955); label
+// them via FORM_NAMES so typing "Mega"/"Primal" — or the base name — surfaces the right form.
 const SPECIES_OPTS = Object.entries(SPECIES)
-  .map(([id, sp]) => ({ id: +id, name: sp.n, sub: `${typeStr(sp.t)} · BST ${bst(sp.s)}` }))
+  .map(([id, sp]) => ({ id: +id, name: FORM_NAMES[id] || sp.n, sub: `${typeStr(sp.t)} · BST ${bst(sp.s)}` }))
   .sort(byName);
 const ITEM_OPTS = Object.entries(ITEMS)
   .map(([id, it]) => ({ id: +id, name: it.n, sub: it.pk })).sort(byName);
@@ -135,6 +138,11 @@ export default function Rewards() {
       {/* ---- 3. Pokémon ---- */}
       <section className="rw-card">
         <h2>3 · Pokémon</h2>
+        <p className="rw-hint muted small">
+          <strong>Mega &amp; Primal forms</strong> are spawnable — type <em>“Mega”</em> or <em>“Primal”</em>
+          {' '}(e.g. <em>Mega Charizard X</em>, <em>Primal Groudon</em>). They spawn as that permanent form;
+          {' '}as with any spawn, withdraw once and check it in-game.
+        </p>
         {pokemon.map((p, i) => (
           <div className="rw-mon" key={p.key}>
             <div className="rw-mon-head">
