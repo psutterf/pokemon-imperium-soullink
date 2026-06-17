@@ -1,5 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
-import { useRunContext } from './runContext.js';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { store } from '../lib/store.js';
 import { DEFAULT_WHEEL, WHEEL_PALETTE } from '../data/wheelDefaults.js';
 
@@ -28,9 +27,19 @@ const pt = (deg, r, cx = 100, cy = 100) => {
 };
 
 export default function Wheel() {
-  const { run, reload } = useRunContext();
+  // Wheels are GLOBAL (shared across every run + both players), loaded from / saved to the store's
+  // global wheel record rather than the current run. Live-updates via subscribeWheels.
+  const [raw, setRaw] = useState(null);
+  const loadWheels = useCallback(async () => { setRaw(await store.getWheels()); }, []);
+  useEffect(() => {
+    // loadWheels() setStates after an await (not synchronously), like useRun's reload().
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadWheels();
+    const unsub = store.subscribeWheels(loadWheels);
+    return unsub;
+  }, [loadWheels]);
 
-  const wheels = useMemo(() => readWheels(run.wheel), [run.wheel]);
+  const wheels = useMemo(() => readWheels(raw), [raw]);
   const [wheelIdx, setWheelIdx] = useState(0);
   const active = wheels[wheelIdx] || wheels[0];
   const seed = wheelIdx === 0; // Wheel 1 falls back to seeded defaults until edited
@@ -56,6 +65,14 @@ export default function Wheel() {
   };
 
   const seg = rewards.length ? 360 / rewards.length : 360;
+
+  // Label fitting: anchor each label at the rim and read inward (so it never crosses the hub into the
+  // opposite slice), shrink the font as slices multiply, and truncate to the usable radial length so a
+  // long reward can't bleed past the hub. The FULL label still shows in the result + recent-spins list.
+  const R_OUT = 94;                                             // label outer radius (rim is 100)
+  const fontPx = Math.max(4.5, Math.min(7.5, 90 / rewards.length));
+  const maxChars = Math.max(5, Math.floor((R_OUT - 16) / (0.55 * fontPx))); // 16 ≈ hub + margin
+  const fit = (s) => (s && s.length > maxChars ? `${s.slice(0, maxChars - 1).trimEnd()}…` : s);
 
   const slices = useMemo(() => rewards.map((r, i) => {
     const a0 = i * seg, a1 = (i + 1) * seg;
@@ -89,10 +106,10 @@ export default function Wheel() {
     setHistory((h) => [{ key: uid(), label: won.label, at: Date.now() }, ...h].slice(0, 8));
   };
 
-  // --- editing: persist the active wheel's segments back into the combined `wheel` column ---
+  // --- editing: persist the active wheel's segments back into the global wheel record ---
   const save = (nextSegments) => {
     const next = wheels.map((w, i) => (i === wheelIdx ? { ...w, segments: nextSegments } : w));
-    return store.updateRun(run.id, { wheel: { wheels: next } }).then(reload);
+    return store.setWheels({ wheels: next }).then(loadWheels);
   };
   const editStart = () => { if (seed && !active.segments?.length) save(DEFAULT_WHEEL); setEditing(true); };
   const upSeg = (i, patch) => save(rewards.map((r, j) => (j === i ? { ...r, ...patch } : r)));
@@ -129,8 +146,8 @@ export default function Wheel() {
             ))}
             {rewards.length > 1 && slices.map((s) => (
               <g key={`t-${s.id}`} transform={`rotate(${s.mid} 100 100) rotate(${s.left ? 90 : -90} 100 100)`}>
-                <text x={s.left ? 52 : 148} y="100" textAnchor={s.left ? 'start' : 'end'}
-                  dominantBaseline="middle" className="wheel-text">{s.label}</text>
+                <text x={s.left ? 100 - R_OUT : 100 + R_OUT} y="100" textAnchor={s.left ? 'start' : 'end'}
+                  dominantBaseline="middle" className="wheel-text" style={{ fontSize: `${fontPx}px` }}>{fit(s.label)}</text>
               </g>
             ))}
             <circle cx="100" cy="100" r="13" fill="var(--bg2)" stroke="var(--line)" strokeWidth="1" />

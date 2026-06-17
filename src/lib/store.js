@@ -33,6 +33,12 @@ const makeCode = () => {
 
 const emptyTokens = () => ({ 1: { nav: 0, reroll: 0 }, 2: { nav: 0, reroll: 0 } });
 
+// The prize wheels are GLOBAL (shared across every run, and between both players), not per-run. In
+// cloud mode they live on a single sentinel `runs` row with this fixed id (reuses the existing `wheel`
+// column + open RLS, so no new table/migration). In local mode they live in one localStorage key.
+const WHEELS_ID = '00000000-0000-0000-0000-000000000000';
+const WHEELS_LKEY = 'pis:wheels';
+
 /* ------------------------------------------------------------------ */
 /* Local adapter                                                       */
 /* ------------------------------------------------------------------ */
@@ -52,7 +58,7 @@ const localStore = {
   async createRun({ name, randomized, p1, p2, eggCount }) {
     let code = makeCode();
     while (localStorage.getItem(LCODE(code))) code = makeCode();
-    const run = { id: uid(), name, join_code: code, randomized: !!randomized, egg_count: eggCount ?? 6, team: [], custom_locations: [], wheel: [], tokens: emptyTokens() };
+    const run = { id: uid(), name, join_code: code, randomized: !!randomized, egg_count: eggCount ?? 6, team: [], custom_locations: [], tokens: emptyTokens() };
     const doc = {
       run,
       players: [
@@ -115,6 +121,26 @@ const localStore = {
     const storageHandler = (e) => {
       if (e.key === LKEY(id)) onChange();
     };
+    channel?.addEventListener('message', handler);
+    window.addEventListener('storage', storageHandler);
+    return () => {
+      channel?.removeEventListener('message', handler);
+      window.removeEventListener('storage', storageHandler);
+    };
+  },
+  // Global prize wheels (shared across all runs on this device).
+  async getWheels() {
+    const raw = localStorage.getItem(WHEELS_LKEY);
+    return raw ? JSON.parse(raw) : null;
+  },
+  async setWheels(wheel) {
+    localStorage.setItem(WHEELS_LKEY, JSON.stringify(wheel));
+    channel?.postMessage({ wheels: true });
+    return wheel;
+  },
+  subscribeWheels(onChange) {
+    const handler = (e) => { if (e.data?.wheels) onChange(); };
+    const storageHandler = (e) => { if (e.key === WHEELS_LKEY) onChange(); };
     channel?.addEventListener('message', handler);
     window.addEventListener('storage', storageHandler);
     return () => {
@@ -189,6 +215,28 @@ const cloudStore = {
       .channel(`run-${id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'catches', filter: `run_id=eq.${id}` }, onChange)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'runs', filter: `id=eq.${id}` }, onChange)
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  },
+  // Global prize wheels: one shared sentinel row, so they're the same in every run and synced between
+  // both players. Reuses the runs table's `wheel` column (open RLS) — no extra table/migration.
+  async getWheels() {
+    const { data } = await supabase.from('runs').select('wheel').eq('id', WHEELS_ID).maybeSingle();
+    return data?.wheel ?? null;
+  },
+  async setWheels(wheel) {
+    const { error } = await supabase
+      .from('runs')
+      .upsert({ id: WHEELS_ID, name: '__wheels__', join_code: '__WHEELS__', wheel })
+      .select()
+      .single();
+    if (error) throw error;
+    return wheel;
+  },
+  subscribeWheels(onChange) {
+    const ch = supabase
+      .channel('wheels-global')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'runs', filter: `id=eq.${WHEELS_ID}` }, onChange)
       .subscribe();
     return () => supabase.removeChannel(ch);
   },
