@@ -9,8 +9,8 @@
 //  - Single 28-section save (ids 0-27) across sectors 0-27, WEAR-LEVELED: the sector<->id map AND
 //    the item-encryption key rotate on every in-game save, so we read both live from the file.
 //  - SaveBlock2 = section id 0; SaveBlock1 = ids 1-4 (0xFF4 data bytes each, joined).
-//  - PC-box storage is RELOCATED by this hack — never a fixed id. We find it dynamically: the
-//    section(s) already holding >=5 internally-valid box Pokemon.
+//  - PC-box storage = sections 17-25 (expansion) / 5-13 (vanilla), located by layout like saveParser
+//    (works with empty boxes); concatenated they hold u32 currentBox + 420 box slots (80 bytes each).
 //  - Item quantity = qty XOR (key16); key16 = u32 at SaveBlock2+0x44, low 16 bits.
 //  - Section checksum = sum of u32 words over 0xFF4 bytes, folded to u16, stored at +0xFF6.
 //  - Pokemon: standard Gen-3 80-byte box structure; 48-byte data XOR-keyed by (PID^OTID), four
@@ -128,19 +128,6 @@ function decrypt48(blk) {
   return { pid, otid, key, dec, order: ORDER[pid % 24] };
 }
 
-// Is this 80-byte block a real, internally-checksum-valid box Pokemon? Returns species or null.
-function validBoxMon(blk) {
-  const pid = u32(blk, 0);
-  if (pid === 0) return null;
-  const { dec, order } = decrypt48(blk);
-  let chk = 0;
-  for (let k = 0; k < 48; k += 2) chk = (chk + u16(dec, k)) & 0xffff;
-  if (chk === 0 || chk !== u16(blk, 0x1c)) return null;
-  const g = order.indexOf('G') * 12;
-  const sp = u16(dec, g) & 0x7ff;
-  return sp >= 1 && sp <= 1525 ? sp : null;
-}
-
 // Build a fresh level-1 box Pokemon from a template (an existing party/box mon, so the new mon
 // inherits the player's OT id and obeys). Overrides species, ability slot, moves; neutralizes
 // nature; zeroes experience/EVs/held-item. Returns 80 bytes.
@@ -194,28 +181,23 @@ function buildMon(template80, { species, abilityNum = 0, moveIds = [] }) {
   return out;
 }
 
-// Locate PC-box storage dynamically and return a flat list of empty 80-byte slots.
-function findEmptyBoxSlots(core, secs) {
-  const slots = [];
-  let storageFound = false;
-  for (const id of Object.keys(secs).map(Number).sort((a, b) => a - b)) {
-    if (id <= 4) continue; // 0 = SaveBlock2, 1-4 = SaveBlock1 (party lives here, not boxes)
-    const off = secs[id];
-    let phase = null, cnt = 0;
-    for (let o = 0; o <= DATASZ - 80; o += 4) {
-      if (validBoxMon(core.subarray(off + o, off + o + 80)) != null) {
-        cnt++;
-        if (phase == null) phase = o % 80;
-      }
-    }
-    if (cnt >= 5 && phase != null) {
-      storageFound = true;
-      for (let o = phase; o <= DATASZ - 80; o += 80) {
-        if (u32(core, off + o) === 0) slots.push({ id, off, local: o });
-      }
-    }
-  }
-  return { storageFound, slots };
+// PC-box storage is located by the SAVE LAYOUT (the same way saveParser does), NOT by scanning for
+// existing mons — so it works even when every box is empty (the old ">=5 valid mons" heuristic failed
+// then). Expansion (Imperium) single-save: section ids 17-25; vanilla two-slot: 5-13. The
+// PokemonStorage blob is those sections concatenated in id order: a u32 `currentBox`, then 420 box
+// slots (14 boxes x 30) of 80 bytes each starting at offset 4 — exactly what the parser reads.
+const PC_BOX_SLOTS = 14 * 30;
+function pcSections(secs) {
+  const maxId = Math.max(...Object.keys(secs).map(Number));
+  const [start, end] = maxId > 13 ? [17, 25] : [5, 13];
+  const parts = [];
+  for (let id = start; id <= end; id++) if (secs[id] != null) parts.push({ id, off: secs[id] });
+  return parts;
+}
+function joinPC(core, parts) {
+  const buf = new Uint8Array(parts.length * DATASZ);
+  parts.forEach((p, n) => buf.set(core.subarray(p.off, p.off + DATASZ), n * DATASZ));
+  return buf;
 }
 
 // High-level: apply item + pokemon edits to a loaded save (mutates save.core). Returns a log.
@@ -240,20 +222,33 @@ export function applyEdits(save, { items = [], pokemon = [] }) {
     if (u32(template, 0) === 0) {
       log.push('!! No party Pokémon to use as a template — cannot spawn Pokémon.');
     } else {
-      const { storageFound, slots } = findEmptyBoxSlots(core, secs);
-      if (!storageFound) {
+      const parts = pcSections(secs);
+      if (!parts.length) {
         log.push('!! Could not locate PC box storage — no Pokémon spawned.');
       } else {
-        const touched = new Set();
-        let qi = 0;
+        const buf = joinPC(core, parts);
+        let scan = 0, placed = 0;
         for (const spec of pokemon) {
-          if (qi >= slots.length) { log.push(`!! No empty PC box slots left for ${SPECIES[spec.species]?.n || spec.species}.`); continue; }
-          const slot = slots[qi++];
-          core.set(buildMon(template, spec), slot.off + slot.local);
-          touched.add(slot.off);
-          log.push(`spawned ${SPECIES[spec.species]?.n || `#${spec.species}`} → PC box (section ${slot.id})`);
+          // Next empty box slot (PID == 0), scanning the 420 slots after the u32 `currentBox` field.
+          let local = -1;
+          for (; scan < PC_BOX_SLOTS; scan++) {
+            const o = 4 + scan * 80;
+            if (o + 80 > buf.length) break;
+            if (u32(buf, o) === 0) { local = o; scan++; break; }
+          }
+          if (local < 0) { log.push(`!! No empty PC box slots left for ${SPECIES[spec.species]?.n || spec.species}.`); continue; }
+          buf.set(buildMon(template, spec), local);
+          placed++;
+          const box = Math.floor((local - 4) / 80 / 30) + 1;
+          log.push(`spawned ${SPECIES[spec.species]?.n || `#${spec.species}`} → PC box ${box}`);
         }
-        for (const off of touched) setU16(core, off + 0x0ff6, checksum(core, off));
+        if (placed) {
+          // Split the storage blob back into its sections; recompute each one's checksum.
+          parts.forEach((p, n) => {
+            core.set(buf.subarray(n * DATASZ, (n + 1) * DATASZ), p.off);
+            setU16(core, p.off + 0x0ff6, checksum(core, p.off));
+          });
+        }
       }
     }
   }
