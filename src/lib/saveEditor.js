@@ -23,6 +23,9 @@ import { ITEMS } from '../data/items.js';
 const SIG = 0x08012025;
 const DATASZ = 0x0ff4;
 const TACKLE = 33; // default move when none chosen
+// Every spawned reward mon is stamped as met at Petalburg Woods (#59) so they all funnel to one
+// board row; the importer protects that row from being overwritten on re-sync (see SaveImport).
+const MET_PETALBURG_WOODS = 59;
 
 // Bag pockets: offset within the joined SaveBlock1 buffer, and slot capacity.
 export const POCKETS = {
@@ -155,7 +158,8 @@ function buildMon(template80, { species, abilityNum = 0, moveIds = [] }) {
   // EVs + contest stats: zero (a level-1 mon).
   for (let i = 0; i < 12; i++) E[i] = 0;
 
-  // Misc: met level 1; perfect IVs; ability slot via bit 31; not an egg.
+  // Misc: met location Petalburg Woods; met level 1; perfect IVs; ability slot via bit 31; not an egg.
+  M[1] = MET_PETALBURG_WOODS;
   setU16(M, 2, (u16(M, 2) & ~0x7f) | 1);
   setU32(M, 4, (0x3fffffff | (abilityNum ? 0x80000000 : 0)) >>> 0);
 

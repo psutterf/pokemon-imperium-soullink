@@ -9,6 +9,11 @@ import { buildLocations } from '../data/locations.js';
 // mon found there is marked dead on import; anything else (party or another box) is alive.
 const DEAD_BOX = 14;
 
+// Rewards-tab spawns are all stamped as met at Petalburg Woods, so on a re-sync every reward mon
+// resolves to this one row. To keep the real first encounter (and manually-entered reward pairs)
+// intact, the importer never OVERWRITES this row once it has a catch — it's filled at most once.
+const REWARD_LOC = 'petalburg-woods';
+
 // Fallarbor Town sells unlimited starter eggs, and every one of them is met at "Fallarbor Town".
 // Met location alone therefore can't tell two starter eggs apart, so they can't be matched to a
 // specific egg row by name — they must be spread across the rows in order (see buildRows).
@@ -78,11 +83,31 @@ export default function SaveImport({ run, onClose, onImported }) {
     return taken;
   }, [run.catches, slot]);
 
+  // Whether Petalburg Woods already holds a catch for the slot being imported (so it's protected).
+  const rewardLocTaken = usedLocations.has(REWARD_LOC);
+
+  // The rows that will actually be written: skip Petalburg Woods entirely if it already has a catch,
+  // and otherwise let it be filled at most once this pass (so multiple reward mons can't pile onto it).
+  const importedRows = useMemo(() => {
+    if (!rows) return [];
+    let rewardFilled = rewardLocTaken;
+    const out = [];
+    for (const r of rows) {
+      if (!r.include || !r.locationId) continue;
+      if (r.locationId === REWARD_LOC) {
+        if (rewardFilled) continue;
+        rewardFilled = true;
+      }
+      out.push(r);
+    }
+    return out;
+  }, [rows, rewardLocTaken]);
+  const importedKeys = useMemo(() => new Set(importedRows.map((r) => r.key)), [importedRows]);
+
   const confirm = async () => {
     setBusy(true);
     try {
-      for (const r of rows) {
-        if (!r.include || !r.locationId) continue;
+      for (const r of importedRows) {
         const m = r.mon;
         await store.upsertCatch(run.id, {
           id: `${r.locationId}:${slot}`,
@@ -138,7 +163,9 @@ export default function SaveImport({ run, onClose, onImported }) {
           Abilities are randomized per-run and aren't stored in the save, so set each mon's ability
           on the board (the field autocompletes, including Imperium's custom abilities).
           Pokémon in <strong>PC box {DEAD_BOX}</strong> are imported as <strong>dead</strong>; anything
-          else (party or another box) is alive.
+          else (party or another box) is alive. <strong>Petalburg Woods</strong> is the Rewards-spawn
+          location: once it has a catch it's <strong>never overwritten</strong> by a re-sync, so log
+          reward Pokémon as manual pairs on the board.
         </p>
 
         {rows && rows.some((r) => r.include && !r.locationId) && (
@@ -153,7 +180,8 @@ export default function SaveImport({ run, onClose, onImported }) {
             <div className="import-list">
               {rows.map((r, i) => {
                 const m = r.mon;
-                const dup = r.locationId && usedLocations.has(r.locationId);
+                const protectedReward = r.include && r.locationId === REWARD_LOC && !importedKeys.has(r.key);
+                const dup = r.locationId && usedLocations.has(r.locationId) && !protectedReward;
                 const unmatched = r.include && !r.locationId;
                 return (
                   <div className={`import-row ${r.include ? '' : 'off'} ${unmatched ? 'unmatched' : ''}`} key={r.key}>
@@ -172,12 +200,13 @@ export default function SaveImport({ run, onClose, onImported }) {
                       {LOCATIONS.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
                     </select>
                     {dup && <span className="dup" title="Overwrites an existing catch on this location">replaces</span>}
+                    {protectedReward && <span className="kept" title="Petalburg Woods already has a catch — it won't be overwritten (add reward pairs manually)">kept</span>}
                   </div>
                 );
               })}
             </div>
             <div className="modal-foot">
-              <span className="muted">{rows.filter((r) => r.include && r.locationId).length} to import</span>
+              <span className="muted">{importedRows.length} to import</span>
               <button className="primary" disabled={busy} onClick={confirm}>Import</button>
             </div>
           </>

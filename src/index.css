@@ -150,6 +150,7 @@ button.danger { background: var(--danger); color: #fff; border: none; border-rad
 .imon em { color: var(--muted); font-style: normal; }
 .shiny { margin-left: 4px; }
 .egg, .dup { font-size: 10px; background: var(--bg3); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; margin-left: 6px; color: var(--warn); }
+.kept { font-size: 10px; background: var(--bg3); border: 1px solid var(--accent); border-radius: 4px; padding: 1px 5px; margin-left: 6px; color: var(--accent); }
 .dead-badge { font-size: 10px; background: var(--danger); color: #fff; border-radius: 4px; padding: 1px 6px; margin-left: 6px; font-weight: 700; }
 .modal-foot { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-top: 1px solid var(--line); }
 
