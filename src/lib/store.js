@@ -192,12 +192,17 @@ const cloudStore = {
   },
   async upsertCatch(id, c) {
     const row = { id: c.id || uid(), run_id: id, status: 'alive', source: 'manual', ...c };
-    const { data, error } = await supabase.from('catches').upsert(row).select().single();
+    // Conflict target is the composite primary key (run_id, id) — see migration-006. This is what
+    // keeps a catch (and its manually-typed ability) scoped to ONE run: a different run upserting the
+    // same "<location>:<slot>" id inserts its own row instead of merging onto another run's row.
+    const { data, error } = await supabase.from('catches').upsert(row, { onConflict: 'run_id,id' }).select().single();
     if (error) throw error;
     return data;
   },
   async deleteCatch(id, catchId) {
-    await supabase.from('catches').delete().eq('id', catchId);
+    // Scope by run_id too: the catch id ("<location>:<slot>") is only unique WITHIN a run now that
+    // the primary key is composite (run_id, id), so the same id can exist in other runs.
+    await supabase.from('catches').delete().eq('run_id', id).eq('id', catchId);
   },
   async setTokens(id, slot, tokens) {
     const { data: run } = await supabase.from('runs').select('tokens').eq('id', id).single();

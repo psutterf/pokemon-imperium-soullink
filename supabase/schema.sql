@@ -19,7 +19,7 @@ create table if not exists runs (
 );
 
 create table if not exists catches (
-  id           text primary key,          -- "<location_id>:<slot>"
+  id           text not null,             -- "<location_id>:<slot>" (unique per run, not globally)
   run_id       uuid not null references runs(id) on delete cascade,
   location_id  text not null,
   slot         int  not null check (slot in (1,2)),
@@ -32,7 +32,10 @@ create table if not exists catches (
   status       text not null default 'alive',  -- alive | boxed | dead | voided
   source       text not null default 'manual', -- manual | save
   notes        text,
-  updated_at   timestamptz not null default now()
+  updated_at   timestamptz not null default now(),
+  -- Composite PK: a catch id is "<location>:<slot>", which repeats across runs, so it must be scoped
+  -- by run_id. Without this, two runs collided on one row and abilities bled between runs.
+  primary key (run_id, id)
 );
 
 create index if not exists catches_run_idx on catches(run_id);
